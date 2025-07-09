@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     
+    <!-- Step 1: Add Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <style>
         :root {
             --background-color: #000000;
@@ -19,21 +23,33 @@
             height: 100%;
             margin: 0;
             overflow: hidden;
+            background-color: var(--background-color); /* Fallback bg */
         }
         body {
             display: flex;
             flex-direction: column;
             position: relative;
-            background-color: var(--background-color);
         }
+
+        /* Step 2: Style the Three.js Canvas as the background */
+        #skybox-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Place it at the very bottom */
+        }
+
+        /* Step 3: Ensure UI is layered on top */
         #header {
             display: flex;
             align-items: center;
             min-height: 80px;
             padding: 0;
             background-color: var(--background-color);
-            position: relative;
-            z-index: 3;
+            position: relative; /* Must be relative to respect z-index */
+            z-index: 1; /* Above the canvas */
         }
         #logo {
             max-height: 100%;
@@ -57,115 +73,94 @@
             background-color: var(--background-color);
         }
         #audio-controls {
-            background: none;
-            border: none;
-            padding: 10px;
-            margin-right: 15px;
-            cursor: pointer;
+            background: none; border: none; padding: 10px;
+            margin-right: 15px; cursor: pointer;
             color: var(--muted-color);
             transition: color 0.2s ease-in-out;
         }
-        #audio-controls:hover {
-            color: #FFFFFF;
-        }
-        #audio-controls.playing {
-            color: var(--accent-color);
-        }
+        #audio-controls:hover { color: #FFFFFF; }
+        #audio-controls.playing { color: var(--accent-color); }
         #audio-controls:focus-visible {
             outline: 2px solid var(--accent-color);
             outline-offset: 2px;
         }
-        #sky-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            background: linear-gradient(to right, 
-                #4A90E2 0%, #F5A623 25%, #0C0D26 50%, #F5A623 75%, #4A90E2 100%
-            );
-            background-size: 400% 100%;
-            animation: cycleSky 240s linear infinite;
-        }
-        @keyframes cycleSky {
-            from { background-position: 0% 0%; }
-            to { background-position: -200% 0%; }
-        }
-        #particles-container {
-            position: fixed;
-            width: 150vw;
-            height: 150vh;
-            top: 50%;
-            left: 50%;
-            z-index: 1;
-            transform: translate(-50%, -50%);
-            animation: rotateSky 360s linear infinite;
-        }
-        @keyframes rotateSky {
-            from {
-                transform: translate(-50%, -50%) rotate(0deg);
-            }
-            to {
-                transform: translate(-50%, -50%) rotate(360deg);
-            }
-        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>
 </head>
 <body>
-    <div id="sky-background"></div>
-    <div id="particles-container"></div>
+    <!-- The UI remains the same -->
     <div id="header">
         <img id="logo" src="OODA Wayfinders.png" alt="OODA Wayfinders Logo">
         <div id="black-strip"></div>
         <button id="audio-controls" aria-label="Toggle Audio">
-            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <line x1="23" y1="1" x2="1" y2="23"></line>
-            </svg>
+            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>
         </button>
     </div>
     
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     
     <script>
-        document.addEventListener('DOMContentLoaded', (event) => {
-            tsParticles.load("particles-container", {
-                fpsLimit: 60,
-                particles: {
-                    number: {
-                        value: 400,
-                        density: { enable: true, value_area: 800 }
-                    },
-                    shape: {
-                        type: "circle",
-                    },
-                    color: {
-                        value: ["#FFFFFF", "#00FF00", "#7CB8F7"]
-                    },
-                    opacity: {
-                        value: { min: 0.1, max: 0.8 },
-                        animation: {
-                            enable: true,
-                            speed: 0.5,
-                            sync: false
-                        }
-                    },
-                    size: { value: { min: 1, max: 3 } },
-                    move: {
-                        enable: false,
-                    }
-                },
-                interactivity: { enable: false },
-                detectRetina: true
-            });
-        });
+        // --- Step 4: Three.js Skybox Initialization ---
+        let scene, camera, renderer, controls;
 
+        function initSkybox() {
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.id = 'skybox-canvas'; // Assign ID for CSS styling
+            document.body.insertBefore(renderer.domElement, document.body.firstChild); // Insert canvas at the beginning of body
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableZoom = false; // Disable user zoom
+            controls.enablePan = false;  // Disable user pan
+            controls.enableDamping = true; // Makes rotation smooth
+            controls.autoRotate = true;    // Enable auto-rotation
+            controls.autoRotateSpeed = 0.2; // Set a slow, cinematic speed
+
+            // Skybox Textures
+            const imagePrefix = "https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/purplenebula_";
+            const directions  = ["ft", "bk", "up", "dn", "rt", "lf"];
+            const imageSuffix = ".png";
+            
+            const materialArray = [];
+            for (let i = 0; i < 6; i++) {
+                materialArray.push( new THREE.MeshBasicMaterial({
+                    map: new THREE.TextureLoader().load( imagePrefix + directions[i] + imageSuffix ),
+                    side: THREE.BackSide
+                }));
+            }
+            
+            const skyboxGeo = new THREE.BoxGeometry(10000, 10000, 10000);
+            const skybox = new THREE.Mesh(skyboxGeo, materialArray);
+            scene.add(skybox);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Required for damping and auto-rotation
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+        
+        initSkybox();
+        animate();
+
+
+        // --- Audio Control Logic (Unchanged) ---
         const audio = document.getElementById('wayfindersAudio');
         const audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted');
@@ -177,7 +172,6 @@
                 audio.play().catch(() => {});
                 isAudioUnlocked = true;
             }
-
             if (audio.paused) {
                 audio.play();
                 audioControl.classList.add('playing');
@@ -190,7 +184,6 @@
                 iconMuted.style.display = 'block';
             }
         }
-
         audioControl.addEventListener('click', toggleAudio);
     </script>
 </body>
