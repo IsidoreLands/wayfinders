@@ -58,7 +58,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
     <script>
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
-        let shootingStars, skySphere;
+        let shootingStars, skyCylinder; // --- MODIFIED: Renamed skySphere to skyCylinder
         let uiPlane, hiddenButton;
 
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
@@ -71,7 +71,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 const x = (Math.random() - 0.5) * 2 * radius;
                 const y = Math.random() * radius; 
                 const z = (Math.random() - 0.5) * 2 * radius;
-                if (y < 10) continue; // Don't draw stars right on the horizon line
+                if (y < 10) continue;
                 if (Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.6, 0.1, 0.5 + Math.random() * 0.2);
@@ -142,34 +142,31 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- MODIFIED: Camera FOV reverted to a more natural 75 degrees ---
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 5, 30); // Start slightly above water, looking forward
+            camera.position.set(0, 10, 0); // Position camera slightly above the water plane
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
             const textureLoader = new THREE.TextureLoader();
-            // --- MODIFIED: The definitive texture padding solution ---
             textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(loadedTexture) {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 canvas.width = loadedTexture.image.width;
-                canvas.height = loadedTexture.image.height * 2; // Double the height
-
-                ctx.fillStyle = '#000000'; // Fill with black
+                canvas.height = loadedTexture.image.height * 2;
+                ctx.fillStyle = '#000000';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.drawImage(loadedTexture.image, 0, 0); // Draw original image in the top half
-
+                ctx.drawImage(loadedTexture.image, 0, 0);
                 const paddedTexture = new THREE.CanvasTexture(canvas);
                 paddedTexture.needsUpdate = true;
 
-                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40);
-                const skySphereMat = new THREE.MeshBasicMaterial({ map: paddedTexture, side: THREE.BackSide });
-                skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
-                scene.add(skySphere);
+                // --- MODIFIED: Replaced Sphere with Cylinder for a true panoramic view ---
+                const skyGeo = new THREE.CylinderGeometry(10000, 10000, 4000, 64, 1, true);
+                const skyMat = new THREE.MeshBasicMaterial({ map: paddedTexture, side: THREE.BackSide });
+                skyCylinder = new THREE.Mesh(skyGeo, skyMat);
+                skyCylinder.position.y = 1000; // Move cylinder up so its base is near the horizon
+                scene.add(skyCylinde);
             });
 
             const waterGeometry = new THREE.PlaneGeometry(20000, 20000);
@@ -179,7 +176,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
                 waterColor: 0x001e0f, distortionScale: 3.7,
             });
-            ocean.rotation.x = -Math.PI / 2; // Position the water at y=0
+            ocean.rotation.x = -Math.PI / 2;
             scene.add(ocean);
 
             createStarfield();
@@ -195,35 +192,34 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Gentle camera sway
-            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 1;
-            camera.lookAt(0, 10, -200);
+            // --- MODIFIED: Camera sways gently and looks up to push horizon down ---
+            camera.position.y = 10 + Math.sin(elapsedTime * 0.5) * 1;
+            camera.lookAt(0, 35, -100); // Higher lookAt target lowers the horizon line
 
             if (uiPlane) {
-                uiPlane.position.set(0, 30, -100);
+                uiPlane.position.set(0, 40, -120);
                 uiPlane.lookAt(camera.position);
 
-                // Recalculate reflection position
-                hiddenButton.position.set(5, -10, -100); 
+                hiddenButton.position.set(6, 0, -120); // Position on the water plane (y=0)
             }
             
             if (shootingStars) {
                 shootingStars.geometry.attributes.position.array.forEach((_, i) => {
                     if (i % 3 === 1) {
                         shootingStars.geometry.attributes.position.array[i] -= 40;
-                        if (shootingStars.geometry.attributes.position.array[i] < -1000) {
-                            shootingStars.geometry.attributes.position.array[i] = 3000 + Math.random() * 3000;
+                        if (shootingStars.geometry.attributes.position.array[i] < 0) {
+                            shootingStars.geometry.attributes.position.array[i] = 4000 + Math.random() * 3000;
                         }
                     }
                 });
                 shootingStars.geometry.attributes.position.needsUpdate = true;
             }
 
-            if (skySphere) {
-                skySphere.rotation.y -= 0.0002;
+            if (skyCylinder) {
+                skyCylinder.rotation.y -= 0.0001; // Slower rotation
             }
 
-            if (starfield) starfield.rotation.y = elapsedTime * 0.003;
+            if (starfield) starfield.rotation.y = elapsedTime * 0.002;
             if (starMaterial) starMaterial.uniforms['time'].value = elapsedTime;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
@@ -244,9 +240,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             if (oceanAudio.paused) {
                 oceanAudio.volume = 0.2;
                 oceanAudio.muted = false;
-                oceanAudio.play().catch(e => {
-                    console.error("Ocean audio could not be played on interaction:", e);
-                });
+                oceanAudio.play().catch(e => { console.error("Ocean audio could not be played:", e); });
             }
         }
         document.body.addEventListener('click', startAmbientAudio, { once: true });
@@ -254,7 +248,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function toggleMusic(event) {
             event.stopPropagation();
             if (wayfindersAudio.paused) {
-                wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e));
+                wayfindersAudio.play().catch(e => { console.error("Music audio failed to play:", e); });
                 audioControl.classList.add('playing');
                 iconUnmuted.style.display = 'block';
                 iconMuted.style.display = 'none';
