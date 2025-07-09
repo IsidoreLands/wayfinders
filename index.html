@@ -6,8 +6,9 @@
     <title>Wayfinders | OODA WIKI</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- MODIFIED: Added new font and removed old one -->
+    <link href="https://fonts.googleapis.com/css2?family=Seaweed+Script&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
@@ -17,6 +18,10 @@
             --background-color: #000000;
             --accent-color: #00FF00;
             --muted-color: #555555;
+            /* --- NEW: UI Styling Variables --- */
+            --ui-font: 'Seaweed Script', cursive;
+            --ui-font-size: 2.5rem;
+            --ui-color: #FFFFFF;
         }
         html, body {
             height: 100%; margin: 0;
@@ -27,18 +32,84 @@
         }
         #skybox-canvas {
             position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; z-index: 0;
+            width: 100%; height: 100%; z-index: 0; /* Canvas is the bottom layer */
         }
         #header {
             display: flex; align-items: center; min-height: 80px; padding: 0;
-            background-color: var(--background-color); position: relative; z-index: 2;
+            background-color: var(--background-color); position: relative; z-index: 2; /* Header is on top */
         }
         #logo { max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden; }
         #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); }
         #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); transition: color 0.2s ease-in-out; }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
-        @media (max-width: 768px) { #logo { max-width: 40%; max-height: 60px; } #header { min-height: 60px; } }
+        
+        /* --- NEW: The entire UI is now HTML/CSS, floating on top of the canvas --- */
+        #ui-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1; /* Sits between canvas and header */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            width: 100%;
+            text-align: center;
+            pointer-events: none; /* Allows clicks to pass through to the canvas */
+        }
+        .ui-button {
+            border: 2px solid var(--ui-color);
+            color: var(--ui-color);
+            background-color: rgba(0,0,0,0.1); /* Slight dark background for readability */
+            font-family: var(--ui-font);
+            font-size: var(--ui-font-size);
+            padding: 0.5rem 2rem;
+            cursor: pointer;
+            pointer-events: auto; /* Buttons are clickable */
+            position: relative; /* Needed for reflection */
+        }
+        .ui-row {
+            display: flex;
+            gap: 1.5rem;
+        }
+        #btn-signatures { font-style: italic; }
+
+        /* --- NEW: CSS-based Reflection --- */
+        .reflection-container {
+            position: relative;
+        }
+        .reflection-container::after {
+            content: '';
+            position: absolute;
+            bottom: -165%; /* Position below the real button */
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: inherit; /* This will be the water reflection */
+            transform: scaleY(-1);
+            filter: blur(1.5px);
+            /* Create a faded look with a gradient mask */
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0));
+        }
+        #hidden-button-trigger {
+            position: absolute;
+            bottom: -165%;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto; /* This is the only clickable part of the reflection */
+            cursor: pointer;
+            /* background-color: rgba(255,0,0,0.2); Uncomment to debug */
+        }
+
+
+        @media (max-width: 768px) { 
+            #logo { max-width: 40%; max-height: 60px; } 
+            #header { min-height: 60px; } 
+            :root { --ui-font-size: 1.8rem; }
+        }
     </style>
 </head>
 <body>
@@ -53,75 +124,35 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         </button>
     </div>
 
+    <!-- NEW: HTML-based UI Container. It sits on top of the canvas. -->
+    <div id="ui-container">
+        <div class="ui-button" id="btn-signatures">Signatures</div>
+        <div class="ui-row">
+            <div class="ui-button" id="btn-tobe">To be</div>
+            <div class="ui-button reflection-container" id="btn-todo">
+                To do
+                <!-- This is the invisible clickable element for the reflection -->
+                <div id="hidden-button-trigger"></div>
+            </div>
+        </div>
+    </div>
+
+
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
-        let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let galaxyTexture, uiPlane, hiddenButton, shootingStars;
+        let scene, camera, renderer, ocean, clock;
+        let galaxyTexture;
         
-        // --- RE-ADDED: The successful shooting star effect ---
-        function createShootingStars() {
-            const starGeo = new THREE.BufferGeometry();
-            const starCount = 25;
-            const positions = [];
-            for (let i = 0; i < starCount; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * 10000,
-                    1500 + Math.random() * 2000,
-                    (Math.random() - 0.5) * 4000
-                );
-            }
-            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            const starMat = new THREE.PointsMaterial({ color: 0xADD8E6, size: 25, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.9 });
-            shootingStars = new THREE.Points(starGeo, starMat);
-            scene.add(shootingStars);
-        }
-
-        function createInteractive3DUI() {
-            const canvas = document.createElement('canvas');
-            const uiWidth = 1024, uiHeight = 256;
-            canvas.width = uiWidth; canvas.height = uiHeight;
-            const context = canvas.getContext('2d');
-            const buttonWidth = 240, buttonHeight = 70, gap = 30;
-            const totalBottomWidth = buttonWidth * 2 + gap;
-            context.strokeStyle = '#FFFFFF'; context.fillStyle = '#FFFFFF';
-            context.textAlign = 'center'; context.textBaseline = 'middle'; context.lineWidth = 4;
-            context.font = "italic bold 40px 'JetBrains Mono', monospace";
-            context.strokeRect((uiWidth - totalBottomWidth) / 2, 20, totalBottomWidth, buttonHeight);
-            context.fillText("Signatures", uiWidth / 2, 20 + buttonHeight / 2);
-            context.font = "bold 40px 'JetBrains Mono', monospace";
-            context.strokeRect((uiWidth - totalBottomWidth) / 2, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
-            context.fillText("To be", (uiWidth - totalBottomWidth) / 2 + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
-            context.strokeRect((uiWidth - totalBottomWidth) / 2 + buttonWidth + gap, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
-            context.fillText("To do", (uiWidth - totalBottomWidth) / 2 + buttonWidth + gap + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.85 });
-            const geometry = new THREE.PlaneGeometry(uiWidth / 20, uiHeight / 20); // Make UI large and readable
-            uiPlane = new THREE.Mesh(geometry, material);
-            scene.add(uiPlane);
-            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 20, buttonHeight / 20);
-            const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
-            hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            scene.add(hiddenButton);
-        }
-
-        function onMouseClick(event) {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObject(hiddenButton);
-            if (intersects.length > 0) {
-                console.log("SECRET REFLECTION CLICKED! Triggering event TBD.");
-                alert("Hidden action triggered!");
-            }
-        }
+        // --- REMOVED: All UI, raycasting, and mouse coordinate logic ---
+        // --- The UI is now handled by HTML and CSS ---
 
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 50, 300); // Start higher and further back for a grander view
+            camera.position.set(0, 50, 300);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
@@ -150,50 +181,27 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 waterColor: 0x001e0f, distortionScale: 3.7, fog: true
             });
             ocean.rotation.x = -Math.PI / 2;
-            ocean.position.y = -50; // Keep ocean very low in the world
+            ocean.position.y = -50;
             scene.add(ocean);
-            
-            createInteractive3DUI();
-            createShootingStars(); // Create the accent stars
 
-            raycaster = new THREE.Raycaster();
-            mouse = new THREE.Vector2();
-            document.addEventListener('mousedown', onMouseClick, false);
+            // --- NEW: Event listener for the new HTML hidden button ---
+            const hiddenButton = document.getElementById('hidden-button-trigger');
+            hiddenButton.addEventListener('click', () => {
+                 console.log("SECRET REFLECTION CLICKED! Triggering event TBD.");
+                 alert("Hidden action triggered!");
+            });
         }
 
         function animate() {
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- THE DEFINITIVE FIX ---
-            // Camera sways gently while looking very high, forcing the ocean to the bottom third.
-            camera.position.y = 50 + Math.sin(elapsedTime * 0.4) * 5;
+            camera.position.y = 45 + Math.sin(elapsedTime * 0.4) * 5;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 10;
-            camera.lookAt(0, 200, -1500); // High Y value pushes the horizon way down.
+            camera.lookAt(0, 80, -1000); 
 
             if (galaxyTexture) {
-                galaxyTexture.offset.x -= 0.00009; // Gentle scrolling
-            }
-
-            // --- UI positioned in the screen's center ---
-            if (uiPlane) {
-                uiPlane.position.set(0, 180, -1000);
-                uiPlane.lookAt(camera.position);
-
-                // Reflection positioned on the water plane, below the UI
-                hiddenButton.position.set(13, -50, -1000);
-            }
-
-            if (shootingStars) {
-                shootingStars.geometry.attributes.position.array.forEach((_, i) => {
-                    if (i % 3 === 1) { // y-coordinate
-                        shootingStars.geometry.attributes.position.array[i] -= 60; // Speed
-                        if (shootingStars.geometry.attributes.position.array[i] < -500) {
-                            shootingStars.geometry.attributes.position.array[i] = 4000 + Math.random() * 2000; // Reset high
-                        }
-                    }
-                });
-                shootingStars.geometry.attributes.position.needsUpdate = true;
+                galaxyTexture.offset.x -= 0.00008;
             }
 
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
