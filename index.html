@@ -31,7 +31,7 @@
         }
         #header {
             display: flex; align-items: center; min-height: 80px; padding: 0;
-            background-color: var(--background-color); position: relative; z-index: 2; /* Header is highest layer */
+            background-color: var(--background-color); position: relative; z-index: 2;
         }
         #logo { max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden; }
         #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); }
@@ -58,8 +58,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let galaxyTexture; // The only texture we need to animate
-        let uiPlane, hiddenButton;
+        let galaxyTexture, uiPlane, hiddenButton;
         
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
@@ -71,8 +70,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.strokeStyle = '#FFFFFF'; context.fillStyle = '#FFFFFF';
             context.textAlign = 'center'; context.textBaseline = 'middle'; context.lineWidth = 4;
             context.font = "italic bold 40px 'JetBrains Mono', monospace";
-            const topButtonWidth = totalBottomWidth;
-            context.strokeRect((uiWidth - topButtonWidth) / 2, 20, topButtonWidth, buttonHeight);
+            context.strokeRect((uiWidth - totalBottomWidth) / 2, 20, totalBottomWidth, buttonHeight);
             context.fillText("Signatures", uiWidth / 2, 20 + buttonHeight / 2);
             context.font = "bold 40px 'JetBrains Mono', monospace";
             context.strokeRect((uiWidth - totalBottomWidth) / 2, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
@@ -104,8 +102,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 50, 100); // Start higher and further back
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 20000);
+            camera.position.set(0, 30, 150);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
@@ -113,28 +111,28 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
             const textureLoader = new THREE.TextureLoader();
 
-            // Layer 1: Static, sparse star background
-            const staticSkyTexture = textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg');
-            const staticSkyGeo = new THREE.PlaneGeometry(16000, 9000);
-            const staticSkyMat = new THREE.MeshBasicMaterial({ map: staticSkyTexture });
-            const staticSkyPlane = new THREE.Mesh(staticSkyGeo, staticSkyMat);
-            staticSkyPlane.position.set(0, 0, -5000);
-            scene.add(staticSkyPlane);
+            // Layer 1: The sparse 8K star image becomes the actual scene background
+            textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', function (texture) {
+                scene.background = texture;
+            });
             
-            // Layer 2: Scrolling, vibrant galaxy layer
-            galaxyTexture = textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg');
-            galaxyTexture.wrapS = THREE.RepeatWrapping; // Enable repeating for the scroll effect
-            const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
-            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, opacity: 1.0 });
+            // Layer 2: The scrolling galaxy plane
+            galaxyTexture = textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
+                texture.wrapS = THREE.RepeatWrapping; // Allow horizontal repeating
+                texture.wrapT = THREE.RepeatWrapping; // Allow vertical repeating (for sway)
+            });
+            const galaxyGeo = new THREE.PlaneGeometry(8000, 2000); // A wide plane
+            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true });
             const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
-            galaxyPlane.position.set(0, 200, -4000); // Place it in front of the static sky
+            galaxyPlane.position.set(0, 150, -2000); // Position it far away and high up
             scene.add(galaxyPlane);
 
+            // Layer 3: The ocean
             const waterGeometry = new THREE.PlaneGeometry(40000, 40000);
             ocean = new THREE.Water(waterGeometry, {
                 textureWidth: 512, textureHeight: 512,
                 waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }),
-                sunDirection: new THREE.Vector3(0, 1, 0), sunColor: 0xffffff,
+                sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
                 waterColor: 0x001e0f, distortionScale: 3.7, fog: true
             });
             ocean.rotation.x = -Math.PI / 2;
@@ -151,27 +149,27 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Camera sways gently, looking up high to place horizon in bottom third
-            camera.position.y = 50 + Math.sin(elapsedTime * 0.4) * 5;
-            camera.position.x = Math.cos(elapsedTime * 0.2) * 10;
-            camera.lookAt(0, 60, -500);
+            // Aim camera high to keep horizon in bottom third
+            camera.position.y = 30 + Math.sin(elapsedTime * 0.4) * 3;
+            camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
+            camera.lookAt(0, 45, -1000); // Look high into the sky
 
             if (galaxyTexture) {
-                // This creates the slow, majestic, continuous scroll
-                galaxyTexture.offset.x -= 0.0001;
+                galaxyTexture.offset.x -= 0.00005; // Very slow, majestic scroll
             }
 
             if (uiPlane) {
-                uiPlane.position.set(0, 120, -600);
+                uiPlane.position.set(0, 80, -700);
                 uiPlane.lookAt(camera.position);
 
-                hiddenButton.position.set(13.5, 0, -600); // Repositioned reflection on water plane
+                hiddenButton.position.set(11, 0, -700);
             }
 
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
             renderer.render(scene, camera);
         }
+
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -187,7 +185,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             if (oceanAudio.paused) {
                 oceanAudio.volume = 0.2;
                 oceanAudio.muted = false;
-                oceanAudio.play().catch(e => { console.error("Ocean audio could not be played:", e); });
+                oceanAudio.play().catch(e => console.error("Ocean audio could not be played:", e));
             }
         }
         document.body.addEventListener('click', startAmbientAudio, { once: true });
@@ -195,7 +193,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function toggleMusic(event) {
             event.stopPropagation();
             if (wayfindersAudio.paused) {
-                wayfindersAudio.play().catch(e => { console.error("Music audio failed to play:", e); });
+                wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e));
                 audioControl.classList.add('playing');
                 iconUnmuted.style.display = 'block';
                 iconMuted.style.display = 'none';
