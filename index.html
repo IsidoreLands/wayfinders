@@ -64,19 +64,19 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
         const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 2.0 + vColor.r * 100.0); float twinkle = 0.5 + 0.5 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
         
-        // --- MODIFIED: Stars now generate primarily in the upper hemisphere ---
         function createStarfield() {
-            const starGeometry = new THREE.BufferGeometry(), starCount = 50000, positions = [], colors = [], sizes = [];
+            const starGeometry = new THREE.BufferGeometry(), starCount = 30000, positions = [], colors = [], sizes = [];
             const color = new THREE.Color(), radius = 4000;
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = Math.random() * radius; // Ensure y is positive, placing stars above the horizon
+                const y = Math.random() * radius; 
                 const z = (Math.random() - 0.5) * 2 * radius;
-                if(Math.sqrt(x*x + (y-radius/2)*(y-radius/2) + z*z) > radius) continue;
+                if (y < 10) continue; // Don't draw stars right on the horizon line
+                if (Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.6, 0.1, 0.5 + Math.random() * 0.2);
                 colors.push(color.r, color.g, color.b);
-                sizes.push(Math.random() * 4 + 2);
+                sizes.push(Math.random() * 3 + 2);
             }
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
@@ -86,17 +86,12 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(starfield);
         }
 
-        // --- MODIFIED: Shooting stars now generate and fall from high in the sky ---
         function createShootingStars() {
             const starGeo = new THREE.BufferGeometry();
             const starCount = 20;
             const positions = [];
             for (let i = 0; i < starCount; i++) {
-                positions.push(
-                    (Math.random() - 0.5) * 6000,
-                    2000 + Math.random() * 2000, // Start much higher
-                    (Math.random() - 0.5) * 6000
-                );
+                positions.push( (Math.random() - 0.5) * 6000, 2000 + Math.random() * 3000, (Math.random() - 0.5) * 6000 );
             }
             starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             const starMat = new THREE.PointsMaterial({ color: 0x87CEEB, size: 15, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8 });
@@ -123,12 +118,11 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.strokeRect((uiWidth - totalBottomWidth) / 2 + buttonWidth + gap, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
             context.fillText("To do", (uiWidth - totalBottomWidth) / 2 + buttonWidth + gap + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
             const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-            const geometry = new THREE.PlaneGeometry(uiWidth / 40, uiHeight / 40); // Made UI physically larger
+            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.8 });
+            const geometry = new THREE.PlaneGeometry(uiWidth / 25, uiHeight / 25);
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
-
-            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 40, buttonHeight / 40);
+            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 25, buttonHeight / 25);
             const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
             scene.add(hiddenButton);
@@ -148,18 +142,32 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- REBUILT: New camera perspective to create a horizon view ---
-            camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 0, 15); // Start slightly behind origin
+            // --- MODIFIED: Camera FOV reverted to a more natural 75 degrees ---
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
+            camera.position.set(0, 5, 30); // Start slightly above water, looking forward
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
             const textureLoader = new THREE.TextureLoader();
-            textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
+            // --- MODIFIED: The definitive texture padding solution ---
+            textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(loadedTexture) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = loadedTexture.image.width;
+                canvas.height = loadedTexture.image.height * 2; // Double the height
+
+                ctx.fillStyle = '#000000'; // Fill with black
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.drawImage(loadedTexture.image, 0, 0); // Draw original image in the top half
+
+                const paddedTexture = new THREE.CanvasTexture(canvas);
+                paddedTexture.needsUpdate = true;
+
                 const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40);
-                const skySphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
+                const skySphereMat = new THREE.MeshBasicMaterial({ map: paddedTexture, side: THREE.BackSide });
                 skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
                 scene.add(skySphere);
             });
@@ -171,8 +179,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
                 waterColor: 0x001e0f, distortionScale: 3.7,
             });
-            ocean.rotation.x = -Math.PI / 2;
-            ocean.position.y = -15; // --- MODIFIED: Lowered ocean to be below the camera's initial view
+            ocean.rotation.x = -Math.PI / 2; // Position the water at y=0
             scene.add(ocean);
 
             createStarfield();
@@ -188,27 +195,24 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- REBUILT: New camera animation looking out towards a horizon ---
-            camera.position.y = -5 + Math.sin(elapsedTime * 0.5) * 0.5; // Gentle vertical sway
-            camera.position.x = Math.cos(elapsedTime * 0.3) * 0.5; // Gentle horizontal sway
-            camera.lookAt(0, 5, -100); // Look at a fixed point far above the horizon
+            // Gentle camera sway
+            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 1;
+            camera.lookAt(0, 10, -200);
 
-            // --- REBUILT: New UI positioning logic ---
             if (uiPlane) {
-                // Place the UI in a fixed position high in the sky
-                uiPlane.position.set(0, 20, -100);
-                uiPlane.lookAt(camera.position); // Always face the camera
+                uiPlane.position.set(0, 30, -100);
+                uiPlane.lookAt(camera.position);
 
-                // Place the reflection button on the water plane, below the "To Do" button
-                hiddenButton.position.set(3.5, -20, -100); // Manually adjusted position
+                // Recalculate reflection position
+                hiddenButton.position.set(5, -10, -100); 
             }
             
             if (shootingStars) {
                 shootingStars.geometry.attributes.position.array.forEach((_, i) => {
-                    if (i % 3 === 1) { // y-coordinate
-                        shootingStars.geometry.attributes.position.array[i] -= 35;
+                    if (i % 3 === 1) {
+                        shootingStars.geometry.attributes.position.array[i] -= 40;
                         if (shootingStars.geometry.attributes.position.array[i] < -1000) {
-                            shootingStars.geometry.attributes.position.array[i] = 3000 + Math.random() * 2000;
+                            shootingStars.geometry.attributes.position.array[i] = 3000 + Math.random() * 3000;
                         }
                     }
                 });
@@ -216,10 +220,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             }
 
             if (skySphere) {
-                skySphere.rotation.y -= 0.0003;
+                skySphere.rotation.y -= 0.0002;
             }
 
-            if (starfield) starfield.rotation.y = elapsedTime * 0.005; // Slower rotation
+            if (starfield) starfield.rotation.y = elapsedTime * 0.003;
             if (starMaterial) starMaterial.uniforms['time'].value = elapsedTime;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
