@@ -9,9 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     
-    <!-- Step 1: Add Three.js and new Water.js dependency -->
+    <!-- Step 1: REMOVE OrbitControls.js. It is no longer needed. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
 
     <style>
@@ -37,6 +36,7 @@
             padding: 0; background-color: var(--background-color);
             position: relative; z-index: 1;
         }
+        /* ... other UI styles remain the same ... */
         #logo {
             max-height: 100%; max-width: 20%; height: auto;
             margin-left: 20px; overflow: hidden;
@@ -70,22 +70,27 @@
         </button>
     </div>
     
-    <!-- Step 2: Add the new audio element for ambient ocean sounds -->
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
 
     <script>
         // --- Three.js Scene Setup ---
-        let scene, camera, renderer, controls, starMaterial, ocean;
+        let scene, camera, renderer, starMaterial, ocean, clock;
 
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
         const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
 
-        function createStarfield() { /* This function remains unchanged from the previous version */
+        function createStarfield() {
             const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = [];
             const color = new THREE.Color(), radius = 1000;
             for (let i = 0; i < starCount; i++) {
-                const x = (Math.random() - 0.5) * 2 * radius, y = (Math.random() - 0.5) * 2 * radius, z = (Math.random() - 0.5) * 2 * radius;
+                const x = (Math.random() - 0.5) * 2 * radius;
+                const y = (Math.random() - 0.5) * 2 * radius;
+                const z = (Math.random() - 0.5) * 2 * radius;
+                
+                // Step 2: Constrain stars to the upper hemisphere
+                if (y < 0) continue; 
+                
                 if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5);
@@ -101,47 +106,29 @@
         }
 
         function init() {
+            clock = new THREE.Clock(); // Clock for smooth animation timing
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
-            
-            // Step 3: Adjust camera position to be above the ocean, looking at the horizon
-            camera.position.set(0, 30, 200);
+            camera.position.set(0, 5, 50); // Fixed position resembling a boat deck
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableZoom = false; controls.enablePan = false;
-            controls.enableDamping = true;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.05; // Slower rotation
-            controls.maxPolarAngle = Math.PI * 0.55; // Prevent camera from going below the ocean
-            controls.target.set(0, 15, 0); // Aim camera slightly up at the horizon
-
-            // Skybox
-            const skybox = new THREE.Mesh(new THREE.BoxGeometry(10000, 10000, 10000), []); // Will be loaded below
-            scene.add(skybox);
+            
             const loader = new THREE.CubeTextureLoader();
             const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
             scene.background = texture;
 
-            // Step 4: Create the Ocean
             const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
             ocean = new THREE.Water(waterGeometry, {
-                textureWidth: 512,
-                textureHeight: 512,
-                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) {
-                    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-                }),
-                sunDirection: new THREE.Vector3(),
-                sunColor: 0xffffff,
-                waterColor: 0x001e0f, // Dark green/blue water color
-                distortionScale: 3.7,
+                textureWidth: 512, textureHeight: 512,
+                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }),
+                sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
+                waterColor: 0x001e0f, distortionScale: 3.7,
                 fog: scene.fog !== undefined
             });
-            ocean.rotation.x = -Math.PI / 2; // Orient the plane to be flat
+            ocean.rotation.x = -Math.PI / 2;
             scene.add(ocean);
 
             createStarfield();
@@ -149,10 +136,16 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            controls.update();
-            
-            if (starMaterial) starMaterial.uniforms['time'].value += 0.01;
-            if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0; // Animate the ocean waves
+            const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+
+            // Step 3: Programmatic camera movement to simulate boat sway and sky rotation
+            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 0.5; // Gentle up-down bobbing
+            camera.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02;   // Gentle side-to-side roll
+            camera.rotation.y = elapsedTime * 0.01; // Slow, constant rotation of the view
+
+            if (starMaterial) starMaterial.uniforms['time'].value += delta;
+            if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
             renderer.render(scene, camera);
         }
@@ -169,23 +162,24 @@
 
         // --- Audio Control Logic ---
         const wayfindersAudio = document.getElementById('wayfindersAudio');
-        const oceanAudio = document.getElementById('oceanAudio'); // Get the new audio element
+        const oceanAudio = document.getElementById('oceanAudio');
         const audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
-        let isAudioUnlocked = false;
+        
+        // Step 4: Decouple ambient audio from the toggle button
+        function unlockAmbientAudio() {
+            oceanAudio.volume = 0.2;
+            oceanAudio.play().catch(e => console.error("Ocean audio failed to play:", e));
+        }
+        document.body.addEventListener('click', unlockAmbientAudio, { once: true });
 
-        function toggleAudio() {
-            // Step 5: On first interaction, unlock and play BOTH audio tracks
-            if (!isAudioUnlocked) {
-                oceanAudio.volume = 0.2; // Set low volume for ambient sound
-                oceanAudio.play().catch(()=>{});
-                wayfindersAudio.play().catch(()=>{});
-                isAudioUnlocked = true;
-            }
-
-            // This part now only controls the main shanty
+        // Step 5: The toggle now ONLY controls the sea shanty
+        function toggleShanty() {
+            // First click on THIS button should also unlock the ocean audio if it hasn't been already
+            unlockAmbientAudio(); 
+            
             if (wayfindersAudio.paused) {
-                wayfindersAudio.play();
+                wayfindersAudio.play().catch(e => console.error("Shanty audio failed to play:", e));
                 audioControl.classList.add('playing');
                 iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none';
             } else {
@@ -194,7 +188,7 @@
                 iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block';
             }
         }
-        audioControl.addEventListener('click', toggleAudio);
+        audioControl.addEventListener('click', toggleShanty);
     </script>
 </body>
 </html>
