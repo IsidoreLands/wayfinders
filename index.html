@@ -55,7 +55,7 @@
             height: 100%;
             background-color: var(--background-color);
         }
-        #audio-toggle {
+        #audio-controls {
             position: relative;
             margin-left: auto;
             padding: 5px 10px;
@@ -66,10 +66,10 @@
             transition: color 0.2s ease-in-out;
             user-select: none;
         }
-        #audio-toggle:hover {
+        #audio-controls:hover {
             color: #CCCCCC;
         }
-        #audio-toggle.playing {
+        #audio-controls.playing {
             color: var(--accent-color);
         }
         #red-background {
@@ -84,16 +84,15 @@
     <div id="header">
         <img id="logo" src="OODA Wayfinders.png" alt="OODA Wayfinders Logo">
         <div id="black-strip"></div>
-        <div id="audio-toggle" title="Toggle Audio">♪</div>
+        <div id="audio-controls" title="Toggle Audio">♪</div>
     </div>
     <div id="red-background"></div>
     
     <audio id="wayfindersAudio" src="sammysmallseashanty.mp3" loop></audio>
     
     <script>
-        // Audio control
         const audio = document.getElementById('wayfindersAudio');
-        const audioToggle = document.getElementById('audio-toggle');
+        const audioControl = document.getElementById('audio-controls');
         let hasInteracted = false;
         
         function initialPlay() {
@@ -103,9 +102,9 @@
                 if (audio) {
                     audio.play().then(() => {
                         console.log('Audio playing');
-                        audioToggle.classList.add('playing');
+                        audioControl.classList.add('playing');
                     }).catch(error => {
-                        console.error('Audio playback error:', error);
+                        console.error('Autoplay error:', error);
                     });
                 } else {
                     console.error('Audio element not found');
@@ -119,22 +118,22 @@
                 if (audio.paused) {
                     console.log('Toggling audio on');
                     audio.play().then(() => {
-                        audioToggle.classList.add('playing');
+                        audioControl.classList.add('playing');
                     }).catch(error => {
                         console.error('Toggle play error:', error);
                     });
                 } else {
                     console.log('Toggling audio off');
                     audio.pause();
-                    audioToggle.classList.remove('playing');
+                    audioControl.classList.remove('playing');
                 }
             } else {
                 console.error('Audio element not found');
             }
         }
         
-        audioToggle.addEventListener('click', toggleAudio); // Primary toggle event
         window.addEventListener('click', initialPlay, { once: true }); // Fallback on any click
+        audioControl.addEventListener('click', toggleAudio); // Primary toggle event
     </script>
 </body>
 </html>
