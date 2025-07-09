@@ -54,11 +54,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     </div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
-    <!-- MODIFIED: Removed autoplay, will control with JS -->
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
-        // MODIFIED: Removed references to galaxy particle systems
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
         let shootingStars;
         let uiPlane, hiddenButton;
@@ -106,8 +104,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(shootingStars);
         }
         
-        // --- REMOVED: The `createDistantGalaxies` function has been deleted entirely. ---
-
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
             const uiWidth = 1024, uiHeight = 256;
@@ -152,14 +148,14 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
+            // --- MODIFIED: Widened the camera's Field of View (FOV) to 75 to "zoom out" ---
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
             camera.position.set(0, 2.5, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
-            // --- MODIFIED: Swapped to the new ESO image URL ---
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
                 const skySphereGeo = new THREE.SphereGeometry(8000, 60, 40);
@@ -180,7 +176,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
             createStarfield();
             createShootingStars();
-            // --- REMOVED: Call to createDistantGalaxies() ---
             createInteractive3DUI();
 
             raycaster = new THREE.Raycaster();
@@ -229,12 +224,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
         
-        // --- MODIFIED: More robust audio handling for ambient sound ---
         function startAmbientAudio() {
             if (oceanAudio.paused) {
                 oceanAudio.volume = 0.2;
                 oceanAudio.muted = false;
-                // play() returns a promise, which we should handle
                 oceanAudio.play().catch(e => {
                     console.error("Ocean audio could not be played on interaction:", e);
                 });
