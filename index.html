@@ -39,6 +39,12 @@
         #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
+
+        /* --- FIX #2: Restore the missing media query for mobile devices --- */
+        @media (max-width: 768px) { 
+            #logo { max-width: 40%; max-height: 60px; } 
+            #header { min-height: 60px; } 
+        }
     </style>
 </head>
 <body>
@@ -67,7 +73,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             
-            // --- FIX #1: Explicitly clear the canvas to make it transparent ---
             context.clearRect(0, 0, canvas.width, canvas.height);
 
             context.strokeStyle = '#FFFFFF';
@@ -101,7 +106,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", doX, bottomRowY + btnHeight / 2);
 
             const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.95 });
+            // --- FIX #1: Add alphaTest property to discard near-invisible pixels ---
+            const material = new THREE.MeshBasicMaterial({ 
+                map: texture, 
+                transparent: true, 
+                opacity: 0.95,
+                alphaTest: 0.5 
+            });
             const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
@@ -140,9 +151,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- FIX #2: Lower the camera's initial position ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 5, 100); 
+            camera.position.set(0, 5, 100);
             
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
@@ -210,32 +220,27 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- FIX #2: Restore the "boat sway" camera animation ---
             camera.position.y = 5 + Math.sin(elapsedTime * 0.4) * 0.5;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 2;
             
             if (uiPlane) {
-                // --- FIX #3: Position UI closer to the camera to connect it with its reflection ---
                 uiPlane.position.set(
                     camera.position.x,
-                    camera.position.y + 8, // A much smaller offset
+                    camera.position.y + 8, // Bring UI closer to the horizon
                     camera.position.z - 150
                 );
-                // Use the correct orientation method for reflections.
                 uiPlane.rotation.copy(camera.rotation);
 
-                // Position the clickable reflection button dynamically
                 const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
                 const todoButton = clickableObjects.find(o => o.name === 'todo');
                 if (reflectionButton && todoButton) {
                     const worldPos = new THREE.Vector3();
                     todoButton.getWorldPosition(worldPos);
                     reflectionButton.position.set(worldPos.x, -worldPos.y + (2 * ocean.position.y), worldPos.z);
-                    reflectionButton.rotation.copy(camera.rotation); // Keep its orientation correct too
+                    reflectionButton.rotation.copy(camera.rotation);
                 }
             }
             
-            // The camera now looks forward towards the general area of the UI
             if (uiPlane) {
                 camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
