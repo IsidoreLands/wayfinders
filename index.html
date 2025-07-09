@@ -64,8 +64,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
             const size = 1024;
-            canvas.width = size;
-            canvas.height = size / 2;
+            canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             
             context.strokeStyle = '#FFFFFF';
@@ -100,46 +99,47 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.95 });
-            const geometry = new THREE.PlaneGeometry(160, 80);
+            const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
-            scene.add(uiPlane); // We will position this in the animate loop
+            scene.add(uiPlane);
 
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             
             const sigGeo = new THREE.PlaneGeometry(90, 20);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
-            sigBtn.position.set(0, 16, 0.1);
+            sigBtn.position.set(0, 12, 0.1);
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
             const beGeo = new THREE.PlaneGeometry(43, 20);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
-            beBtn.position.set(-24, -20, 0.1);
+            beBtn.position.set(-24, -15, 0.1);
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
             const doGeo = new THREE.PlaneGeometry(43, 20);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
-            doBtn.position.set(24, -20, 0.1);
+            doBtn.position.set(24, -15, 0.1);
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
             const doRefGeo = new THREE.PlaneGeometry(43, 20);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
-            scene.add(doRefBtn); // This will be positioned relative to the uiPlane in the animate loop
+            scene.add(doRefBtn);
             clickableObjects.push(doRefBtn);
         }
 
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
+            // --- MODIFIED: Camera starting position lowered, per consultant's advice ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 50, 300);
+            camera.position.set(0, 5, 100);
             
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
@@ -207,30 +207,33 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- LOCKED BACKGROUND ANIMATION ---
-            camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
-            camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
-            camera.lookAt(0, 80, -1000); 
-
-            // --- THE DEFINITIVE FIX: Using rotation.copy() ---
+            // --- MODIFIED: Camera animation reverted to low "boat sway" ---
+            camera.position.y = 5 + Math.sin(elapsedTime * 0.4) * 0.5;
+            camera.position.x = Math.cos(elapsedTime * 0.2) * 2;
+            
+            // --- MODIFIED: UI now uses rotation.copy and is positioned correctly ---
             if (uiPlane) {
-                // This keeps the UI correctly oriented for both the main and reflection cameras
+                // Position the UI plane high up and in front of the camera.
                 uiPlane.position.set(
                     camera.position.x,
-                    camera.position.y + 20, // Position it vertically in the frame
-                    camera.position.z - 200 // Position it at a fixed distance
+                    camera.position.y + 35,
+                    camera.position.z - 150
                 );
-                uiPlane.rotation.copy(camera.rotation); // The key fix
+                // The correct orientation method for reflections.
+                uiPlane.rotation.copy(camera.rotation);
 
-                // Position the reflection button dynamically
                 const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
                 const todoButton = clickableObjects.find(o => o.name === 'todo');
                 if (reflectionButton && todoButton) {
                     const worldPos = new THREE.Vector3();
-                    todoButton.getWorldPosition(worldPos); // Get the world position of the real button
-                    reflectionButton.position.set(worldPos.x, -worldPos.y, worldPos.z);
-                    reflectionButton.lookAt(0, -camera.position.y, 0); // Orient it for clicking
+                    todoButton.getWorldPosition(worldPos);
+                    reflectionButton.position.set(worldPos.x, -worldPos.y + (2*ocean.position.y), worldPos.z);
+                    reflectionButton.rotation.copy(camera.rotation);
                 }
+            }
+            // The camera looks towards the UI plane's general area to keep it centered
+            if (uiPlane) {
+                camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
 
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
