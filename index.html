@@ -17,9 +17,6 @@
             --background-color: #000000;
             --accent-color: #00FF00;
             --muted-color: #555555;
-            --ui-font: 'Seaweed Script', cursive;
-            --ui-font-size: 2.5rem;
-            --ui-color: #FFFFFF;
         }
         html, body {
             height: 100%; margin: 0;
@@ -42,40 +39,6 @@
         #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
-        
-        #ui-container {
-            position: absolute;
-            top: 40%; /* MODIFIED: UI block is higher */
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 3.0rem; /* MODIFIED: Spacing between rows is doubled */
-        }
-        /* MODIFIED: Using <a> tags for native link functionality */
-        .ui-button {
-            border: 2px solid var(--ui-color);
-            color: var(--ui-color);
-            background-color: rgba(0,0,0,0.2);
-            font-family: var(--ui-font);
-            font-size: var(--ui-font-size);
-            padding: 0.5rem 2rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            text-decoration: none;
-        }
-        .ui-button:hover { background-color: rgba(255, 255, 255, 0.1); }
-        .ui-row { display: flex; gap: 1.5rem; }
-        #btn-signatures { font-style: italic; }
-
-        @media (max-width: 768px) { 
-            #logo { max-width: 40%; max-height: 60px; } 
-            #header { min-height: 60px; } 
-            :root { --ui-font-size: 1.8rem; }
-            .ui-button { white-space: nowrap; padding: 0.5rem 1rem; } /* Prevents wrapping */
-        }
     </style>
 </head>
 <body>
@@ -90,15 +53,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         </button>
     </div>
 
-    <!-- The visible UI, now using <a> tags for links -->
-    <div id="ui-container">
-        <a href="https://ooda.wiki/wiki/Signatures" target="_blank" rel="noopener noreferrer" class="ui-button" id="btn-signatures">Signatures</a>
-        <div class="ui-row">
-            <a href="https://en.wikipedia.org/wiki/Wikipedia" target="_blank" rel="noopener noreferrer" class="ui-button" id="btn-tobe">To be</a>
-            <a href="mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge" class="ui-button" id="btn-todo">To do</a>
-        </div>
-    </div>
-
+    <!-- UI is now generated entirely in the 3D scene -->
     <div id="canvas-container"></div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
@@ -106,46 +61,90 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let galaxyTexture, hiddenButton;
+        let galaxyTexture, uiPlane;
+        // --- An array to hold all clickable 3D objects ---
+        const clickableObjects = [];
         
-        // --- RE-ADD: This function creates the invisible 3D plane that the water can reflect ---
-        function createReflectionPlane() {
+        // --- REVERT to the original, successful 3D UI generation method ---
+        function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
             const size = 1024;
-            canvas.width = size; canvas.height = size;
+            canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             
-            context.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-            context.lineWidth = 8;
-            
-            const btnHeight = 140; const btnWidthSignatures = 510;
-            const btnWidthBottom = 240; const gap = 40;
-            
-            // Draw a faint "ghost" image of the UI to be reflected.
-            context.strokeRect((size - btnWidthSignatures) / 2, 20, btnWidthSignatures, btnHeight);
-            context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2, 20 + btnHeight + gap, btnWidthBottom, btnHeight);
-            context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom + gap, 20 + btnHeight + gap, btnWidthBottom, btnHeight);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
-            const geometry = new THREE.PlaneGeometry(80, 80);
-            
-            const reflectionPlane = new THREE.Mesh(geometry, material);
-            reflectionPlane.position.set(0, -35, -400); // Position just above the water
-            reflectionPlane.rotation.x = -0.1; // Slight tilt to catch the light
-            scene.add(reflectionPlane);
+            // --- MODIFIED: Use new font and colors on the canvas drawing ---
+            context.strokeStyle = '#FFFFFF';
+            context.fillStyle = '#FFFFFF';
+            context.lineWidth = 4;
+            const seaweedFont = "60px 'Seaweed Script', cursive";
 
-            const hiddenGeo = new THREE.PlaneGeometry(25, 11);
-            const hiddenMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }); // Invisible
-            hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            hiddenButton.position.set(22, -43, -400); // Position over the reflection of "To Do"
-            scene.add(hiddenButton);
+            const btnHeight = 100;
+            const btnWidthSignatures = 520;
+            const btnWidthBottom = 250;
+            const gap = 40;
+            const topRowY = 80;
+            const bottomRowY = topRowY + btnHeight + gap;
+
+            // Draw "Signatures" button
+            context.font = "italic " + seaweedFont;
+            context.strokeRect((size - btnWidthSignatures) / 2, topRowY, btnWidthSignatures, btnHeight);
+            context.fillText("Signatures", size / 2, topRowY + btnHeight / 2 + 10);
+
+            // Draw "To be" and "To do" buttons
+            context.font = seaweedFont;
+            context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2, bottomRowY, btnWidthBottom, btnHeight);
+            context.fillText("To be", (size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom / 2, bottomRowY + btnHeight / 2 + 10);
+            context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom + gap, bottomRowY, btnWidthBottom, btnHeight);
+            context.fillText("To do", (size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2 + 10);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.9 });
+            const geometry = new THREE.PlaneGeometry(100, 50);
+            
+            uiPlane = new THREE.Mesh(geometry, material);
+            scene.add(uiPlane);
+
+            // --- Create invisible planes for clicking ---
+            const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+            
+            // Signatures button
+            const sigGeo = new THREE.PlaneGeometry(51, 10);
+            const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
+            sigBtn.name = "signatures";
+            sigBtn.position.set(0, 7.5, 0.1); // Position relative to uiPlane
+            uiPlane.add(sigBtn); // Attach to uiPlane
+            clickableObjects.push(sigBtn);
+
+            // To be button
+            const beGeo = new THREE.PlaneGeometry(24, 10);
+            const beBtn = new THREE.Mesh(beGeo, invisibleMat);
+            beBtn.name = "tobe";
+            beBtn.position.set(-15, -9.5, 0.1);
+            uiPlane.add(beBtn);
+            clickableObjects.push(beBtn);
+
+            // To do button
+            const doGeo = new THREE.PlaneGeometry(24, 10);
+            const doBtn = new THREE.Mesh(doGeo, invisibleMat);
+            doBtn.name = "todo";
+            doBtn.position.set(15, -9.5, 0.1);
+            uiPlane.add(doBtn);
+            clickableObjects.push(doBtn);
+
+            // To do REFLECTION button
+            const doRefGeo = new THREE.PlaneGeometry(24, 10);
+            const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
+            doRefBtn.name = "todo_reflection";
+            // This one is positioned independently in the world, not attached to uiPlane
+            doRefBtn.position.set(17, -58, -700);
+            scene.add(doRefBtn);
+            clickableObjects.push(doRefBtn);
         }
 
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- NO CHANGES to this stable background camera ---
+            // --- LOCKED BACKGROUND CAMERA ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
             camera.position.set(0, 50, 300);
             
@@ -176,7 +175,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             ocean.position.y = 0;
             scene.add(ocean);
             
-            createReflectionPlane(); // Create the object that generates the reflection
+            createInteractive3DUI();
 
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
@@ -189,10 +188,25 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObject(hiddenButton);
+            const intersects = raycaster.intersectObjects(clickableObjects);
+
             if (intersects.length > 0) {
-                console.log("SECRET REFLECTION CLICKED! Triggering event TBD.");
-                alert("Hidden action triggered!");
+                const clickedName = intersects[0].object.name;
+                switch (clickedName) {
+                    case 'signatures':
+                        window.open('https://ooda.wiki/wiki/Signatures', '_blank');
+                        break;
+                    case 'tobe':
+                        window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank');
+                        break;
+                    case 'todo':
+                        window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge";
+                        break;
+                    case 'todo_reflection':
+                        console.log("SECRET REFLECTION CLICKED! Triggering event TBD.");
+                        alert("Hidden action triggered!");
+                        break;
+                }
             }
         }
 
@@ -200,10 +214,16 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- NO CHANGES to this stable background animation ---
+            // --- LOCKED BACKGROUND ANIMATION ---
             camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
             camera.lookAt(0, 80, -1000); 
+
+            // Position the entire UI plane in the correct spot
+            if (uiPlane) {
+                uiPlane.position.set(0, 85, -700);
+                uiPlane.lookAt(camera.position);
+            }
 
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
