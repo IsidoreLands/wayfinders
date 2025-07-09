@@ -39,8 +39,7 @@
         #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
-
-        /* --- FIX #2: Restore the missing media query for mobile devices --- */
+        
         @media (max-width: 768px) { 
             #logo { max-width: 40%; max-height: 60px; } 
             #header { min-height: 60px; } 
@@ -106,42 +105,48 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", doX, bottomRowY + btnHeight / 2);
 
             const texture = new THREE.CanvasTexture(canvas);
-            // --- FIX #1: Add alphaTest property to discard near-invisible pixels ---
+            // --- FIX #2: Implement consultant's final material settings ---
             const material = new THREE.MeshBasicMaterial({ 
                 map: texture, 
                 transparent: true, 
                 opacity: 0.95,
-                alphaTest: 0.5 
+                alphaTest: 0.5,
+                depthWrite: false,
+                side: THREE.DoubleSide
             });
             const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
 
-            const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+            const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide });
             
-            const sigGeo = new THREE.PlaneGeometry(90, 20);
+            // --- FIX #1: Re-calculate all clickable areas to precisely match the canvas drawing ---
+            const planeW = 120; const planeH = 60;
+            const canW = 1024; const canH = 512;
+
+            const sigGeo = new THREE.PlaneGeometry(btnWidthSignatures / canW * planeW, btnHeight / canH * planeH);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
-            sigBtn.position.set(0, 12, 0.1);
+            sigBtn.position.set(0, 12.5, 0.1); // Y position relative to uiPlane center
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
-            const beGeo = new THREE.PlaneGeometry(43, 20);
+            const beGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
-            beBtn.position.set(-24, -15, 0.1);
+            beBtn.position.set(-((btnWidthBottom / 2 + gap / 2) / canW * planeW), -14, 0.1);
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
-            const doGeo = new THREE.PlaneGeometry(43, 20);
+            const doGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
-            doBtn.position.set(24, -15, 0.1);
+            doBtn.position.set(((btnWidthBottom / 2 + gap / 2) / canW * planeW), -14, 0.1);
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
-            const doRefGeo = new THREE.PlaneGeometry(43, 20);
+            const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
             scene.add(doRefBtn);
@@ -226,7 +231,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             if (uiPlane) {
                 uiPlane.position.set(
                     camera.position.x,
-                    camera.position.y + 8, // Bring UI closer to the horizon
+                    camera.position.y + 8,
                     camera.position.z - 150
                 );
                 uiPlane.rotation.copy(camera.rotation);
