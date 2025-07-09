@@ -62,12 +62,12 @@
             cursor: pointer;
             font-size: 1.5em;
             font-weight: bold;
-            color: #FFFFFF;
+            color: var(--muted-color);
             transition: color 0.2s ease-in-out;
             user-select: none;
         }
         #audio-controls:hover {
-            color: #CCCCCC;
+            color: #FFFFFF;
         }
         #audio-controls.playing {
             color: var(--accent-color);
@@ -94,7 +94,7 @@
         const audio = document.getElementById('wayfindersAudio');
         const audioControl = document.getElementById('audio-controls');
         let hasInteracted = false;
-        
+
         function initialPlay() {
             if (!hasInteracted) {
                 console.log('Initial play attempted');
@@ -111,9 +111,12 @@
                 }
             }
         }
-        
+
         function toggleAudio() {
-            if (!hasInteracted) { initialPlay(); return; }
+            if (!hasInteracted) {
+                initialPlay();
+                return;
+            }
             if (audio) {
                 if (audio.paused) {
                     console.log('Toggling audio on');
@@ -131,9 +134,10 @@
                 console.error('Audio element not found');
             }
         }
-        
-        window.addEventListener('click', initialPlay, { once: true }); // Fallback on any click
-        audioControl.addEventListener('click', toggleAudio); // Primary toggle event
+
+        // Trigger initial play on first interaction with any element
+        document.body.addEventListener('click', initialPlay, { once: true });
+        audioControl.addEventListener('click', toggleAudio);
     </script>
-</body>
+</head>
 </html>
