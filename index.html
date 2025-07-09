@@ -19,11 +19,12 @@
             height: 100%;
             margin: 0;
             overflow: hidden;
-            background-color: var(--background-color);
         }
         body {
             display: flex;
             flex-direction: column;
+            position: relative;
+            background-color: var(--background-color);
         }
         #header {
             display: flex;
@@ -32,7 +33,7 @@
             padding: 0;
             background-color: var(--background-color);
             position: relative;
-            z-index: 2;
+            z-index: 3;
         }
         #logo {
             max-height: 100%;
@@ -56,15 +57,13 @@
             background-color: var(--background-color);
         }
         #audio-controls {
-            position: relative;
-            margin-left: auto;
-            padding: 5px 10px;
+            background: none;
+            border: none;
+            padding: 10px;
+            margin-right: 15px;
             cursor: pointer;
-            font-size: 1.5em;
-            font-weight: bold;
             color: var(--muted-color);
             transition: color 0.2s ease-in-out;
-            user-select: none;
         }
         #audio-controls:hover {
             color: #FFFFFF;
@@ -72,168 +71,126 @@
         #audio-controls.playing {
             color: var(--accent-color);
         }
-        #canvas-container {
-            flex: 1;
-            position: absolute;
+        #audio-controls:focus-visible {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+        #sky-background {
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 0;
+            background: linear-gradient(to right, 
+                #4A90E2 0%, #F5A623 25%, #0C0D26 50%, #F5A623 75%, #4A90E2 100%
+            );
+            background-size: 400% 100%;
+            animation: cycleSky 240s linear infinite;
+        }
+        @keyframes cycleSky {
+            from { background-position: 0% 0%; }
+            to { background-position: -200% 0%; }
+        }
+        #particles-container {
+            position: fixed;
+            width: 150vw;
+            height: 150vh;
+            top: 50%;
+            left: 50%;
             z-index: 1;
+            transform: translate(-50%, -50%);
+            animation: rotateSky 360s linear infinite;
+        }
+        @keyframes rotateSky {
+            from {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+            to {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2/tsparticles.bundle.min.js"></script>
 </head>
 <body>
+    <div id="sky-background"></div>
+    <div id="particles-container"></div>
     <div id="header">
         <img id="logo" src="OODA Wayfinders.png" alt="OODA Wayfinders Logo">
         <div id="black-strip"></div>
-        <div id="audio-controls" title="Toggle Audio">♪</div>
+        <button id="audio-controls" aria-label="Toggle Audio">
+            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <line x1="23" y1="1" x2="1" y2="23"></line>
+            </svg>
+        </button>
     </div>
-    <div id="canvas-container"></div>
     
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="OrbitControls.js"></script>
     <script>
-        // Create scene, camera, renderer
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 50);
-        camera.lookAt(0, 0, 0);
-        
-        const container = document.getElementById('canvas-container');
-        const renderer = new THREE.WebGLRenderer({ alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        container.appendChild(renderer.domElement);
-        
-        // Add ambient light
-        const ambientLight = new THREE.AmbientLight(0x606060);
-        scene.add(ambientLight);
-        
-        // Load star particles
-        const starGeometry = new THREE.BufferGeometry();
-        const starCount = 1000;
-        const positions = new Float32Array(starCount * 3);
-        for (let i = 0; i < starCount; i++) {
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const r = 500 + Math.random() * 200;
-            positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-            positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-            positions[i * 3 + 2] = r * Math.cos(phi);
-        }
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const textureLoader = new THREE.TextureLoader();
-        const starTexture = textureLoader.load('star_particles.png', () => console.log('Star texture loaded'), undefined, (error) => console.error('Star texture error:', error));
-        const starMaterial = new THREE.PointsMaterial({
-            color: 0xffffff,
-            size: 2,
-            map: starTexture,
-            transparent: true,
-            alphaTest: 0.5
+        document.addEventListener('DOMContentLoaded', (event) => {
+            tsParticles.load("particles-container", {
+                fpsLimit: 60,
+                particles: {
+                    number: {
+                        value: 400,
+                        density: { enable: true, value_area: 800 }
+                    },
+                    shape: {
+                        type: "circle",
+                    },
+                    color: {
+                        value: ["#FFFFFF", "#00FF00", "#7CB8F7"]
+                    },
+                    opacity: {
+                        value: { min: 0.1, max: 0.8 },
+                        animation: {
+                            enable: true,
+                            speed: 0.5,
+                            sync: false
+                        }
+                    },
+                    size: { value: { min: 1, max: 3 } },
+                    move: {
+                        enable: false,
+                    }
+                },
+                interactivity: { enable: false },
+                detectRetina: true
+            });
         });
-        const stars = new THREE.Points(starGeometry, starMaterial);
-        scene.add(stars);
-        
-        // Load and create galaxy particles
-        const galaxyCount = 500;
-        const galaxyGeometry = new THREE.BufferGeometry();
-        const galaxyPositions = new Float32Array(galaxyCount * 3);
-        for (let i = 0; i < galaxyCount; i++) {
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const r = 600 + Math.random() * 300;
-            galaxyPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-            galaxyPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-            galaxyPositions[i * 3 + 2] = r * Math.cos(phi);
-        }
-        galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions, 3));
-        const galaxyTextures = [
-            textureLoader.load('galaxy-png-transparent-12.png', () => console.log('Galaxy 12 texture loaded'), undefined, (error) => console.error('Galaxy 12 texture error:', error)),
-            textureLoader.load('galaxy-png-transparent-23.png', () => console.log('Galaxy 23 texture loaded'), undefined, (error) => console.error('Galaxy 23 texture error:', error))
-        ];
-        const galaxyMaterial = new THREE.PointsMaterial({
-            size: 10,
-            transparent: true,
-            opacity: 0.8,
-            map: galaxyTextures[Math.floor(Math.random() * galaxyTextures.length)],
-            alphaTest: 0.5
-        });
-        const galaxies = new THREE.Points(galaxyGeometry, galaxyMaterial);
-        scene.add(galaxies);
-        
-        // Add OrbitControls
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.target.set(0, 0, 0);
-        controls.update();
-        
-        // Slow rotation for Earth's rotation effect
-        const rotationSpeed = 0.0001;
-        function animate() {
-            requestAnimationFrame(animate);
-            galaxies.rotation.y += rotationSpeed;
-            stars.rotation.y += rotationSpeed;
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-        
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        });
-        
-        // Audio control
+
         const audio = document.getElementById('wayfindersAudio');
         const audioControl = document.getElementById('audio-controls');
-        let hasInteracted = false;
-
-        function initialPlay() {
-            if (!hasInteracted) {
-                console.log('Initial play attempted');
-                hasInteracted = true;
-                if (audio) {
-                    audio.play().then(() => {
-                        console.log('Audio playing');
-                        audioControl.classList.add('playing');
-                    }).catch(error => {
-                        console.error('Autoplay error:', error);
-                    });
-                } else {
-                    console.error('Audio element not found');
-                }
-            }
-        }
+        const iconUnmuted = document.getElementById('icon-unmuted');
+        const iconMuted = document.getElementById('icon-muted');
+        let isAudioUnlocked = false;
 
         function toggleAudio() {
-            if (!hasInteracted) {
-                initialPlay();
-                return;
+            if (!isAudioUnlocked) {
+                audio.play().catch(() => {});
+                isAudioUnlocked = true;
             }
-            if (audio) {
-                if (audio.paused) {
-                    console.log('Toggling audio on');
-                    audio.play().then(() => {
-                        audioControl.classList.add('playing');
-                    }).catch(error => {
-                        console.error('Toggle play error:', error);
-                    });
-                } else {
-                    console.log('Toggling audio off');
-                    audio.pause();
-                    audioControl.classList.remove('playing');
-                }
+
+            if (audio.paused) {
+                audio.play();
+                audioControl.classList.add('playing');
+                iconUnmuted.style.display = 'block';
+                iconMuted.style.display = 'none';
             } else {
-                console.error('Audio element not found');
+                audio.pause();
+                audioControl.classList.remove('playing');
+                iconUnmuted.style.display = 'none';
+                iconMuted.style.display = 'block';
             }
         }
 
-        document.body.addEventListener('click', initialPlay, { once: true });
         audioControl.addEventListener('click', toggleAudio);
     </script>
 </body>
