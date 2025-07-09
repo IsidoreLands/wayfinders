@@ -67,6 +67,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             
+            // --- FIX #1: Explicitly clear the canvas to make it transparent ---
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
             context.strokeStyle = '#FFFFFF';
             context.fillStyle = '#FFFFFF';
             context.lineWidth = 6;
@@ -137,9 +140,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- MODIFIED: Camera starting position lowered, per consultant's advice ---
+            // --- FIX #2: Lower the camera's initial position ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 5, 100);
+            camera.position.set(0, 5, 100); 
             
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
@@ -207,31 +210,32 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- MODIFIED: Camera animation reverted to low "boat sway" ---
+            // --- FIX #2: Restore the "boat sway" camera animation ---
             camera.position.y = 5 + Math.sin(elapsedTime * 0.4) * 0.5;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 2;
             
-            // --- MODIFIED: UI now uses rotation.copy and is positioned correctly ---
             if (uiPlane) {
-                // Position the UI plane high up and in front of the camera.
+                // --- FIX #3: Position UI closer to the camera to connect it with its reflection ---
                 uiPlane.position.set(
                     camera.position.x,
-                    camera.position.y + 35,
+                    camera.position.y + 8, // A much smaller offset
                     camera.position.z - 150
                 );
-                // The correct orientation method for reflections.
+                // Use the correct orientation method for reflections.
                 uiPlane.rotation.copy(camera.rotation);
 
+                // Position the clickable reflection button dynamically
                 const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
                 const todoButton = clickableObjects.find(o => o.name === 'todo');
                 if (reflectionButton && todoButton) {
                     const worldPos = new THREE.Vector3();
                     todoButton.getWorldPosition(worldPos);
-                    reflectionButton.position.set(worldPos.x, -worldPos.y + (2*ocean.position.y), worldPos.z);
-                    reflectionButton.rotation.copy(camera.rotation);
+                    reflectionButton.position.set(worldPos.x, -worldPos.y + (2 * ocean.position.y), worldPos.z);
+                    reflectionButton.rotation.copy(camera.rotation); // Keep its orientation correct too
                 }
             }
-            // The camera looks towards the UI plane's general area to keep it centered
+            
+            // The camera now looks forward towards the general area of the UI
             if (uiPlane) {
                 camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
