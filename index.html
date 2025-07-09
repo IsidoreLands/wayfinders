@@ -54,25 +54,24 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     </div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
-    <!-- MODIFIED: Added autoplay and muted attributes to ocean audio -->
-    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop autoplay muted></audio>
+    <!-- MODIFIED: Removed autoplay, will control with JS -->
+    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
-        // --- NEW: Added references for new particle systems ---
+        // MODIFIED: Removed references to galaxy particle systems
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
-        let shootingStars, distantGalaxies1, distantGalaxies2;
+        let shootingStars;
         let uiPlane, hiddenButton;
 
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
         const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 2.0 + vColor.r * 100.0); float twinkle = 0.5 + 0.5 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
         
-        // --- MODIFIED: Increased star count for a denser field ---
         function createStarfield() {
             const starGeometry = new THREE.BufferGeometry(), starCount = 50000, positions = [], colors = [], sizes = [];
             const color = new THREE.Color(), radius = 2000;
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = (Math.random()) * radius; // Spread stars more vertically
+                const y = (Math.random()) * radius;
                 const z = (Math.random() - 0.5) * 2 * radius;
                 if(Math.sqrt(x*x + (y-radius)*(y-radius) + z*z) > radius) continue;
                 positions.push(x, y, z);
@@ -88,7 +87,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(starfield);
         }
 
-        // --- NEW: Function to create shooting stars ---
         function createShootingStars() {
             const starGeo = new THREE.BufferGeometry();
             const starCount = 20;
@@ -108,24 +106,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(shootingStars);
         }
         
-        // --- NEW: Function to create distant galaxies from PNGs ---
-        function createDistantGalaxies() {
-            const galaxyLoader = new THREE.TextureLoader();
-            const galaxyTexture1 = galaxyLoader.load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/galaxy-png-transparent-12.png');
-            const galaxyTexture2 = galaxyLoader.load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/galaxy-png-transparent-23.png');
-
-            const geo1 = new THREE.BufferGeometry();
-            geo1.setAttribute('position', new THREE.Float32BufferAttribute([3000, 800, -4000], 3));
-            const mat1 = new THREE.PointsMaterial({ map: galaxyTexture1, size: 400, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.3 });
-            distantGalaxies1 = new THREE.Points(geo1, mat1);
-            scene.add(distantGalaxies1);
-            
-            const geo2 = new THREE.BufferGeometry();
-            geo2.setAttribute('position', new THREE.Float32BufferAttribute([-3500, 1200, -3000], 3));
-            const mat2 = new THREE.PointsMaterial({ map: galaxyTexture2, size: 350, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.3, rotation: Math.PI / 4 });
-            distantGalaxies2 = new THREE.Points(geo2, mat2);
-            scene.add(distantGalaxies2);
-        }
+        // --- REMOVED: The `createDistantGalaxies` function has been deleted entirely. ---
 
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
@@ -178,8 +159,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
+            // --- MODIFIED: Swapped to the new ESO image URL ---
             const textureLoader = new THREE.TextureLoader();
-            textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', function(texture) {
+            textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
                 const skySphereGeo = new THREE.SphereGeometry(8000, 60, 40);
                 const skySphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
                 const skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
@@ -197,8 +179,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(ocean);
 
             createStarfield();
-            createShootingStars(); // --- NEW: Call function
-            createDistantGalaxies(); // --- NEW: Call function
+            createShootingStars();
+            // --- REMOVED: Call to createDistantGalaxies() ---
             createInteractive3DUI();
 
             raycaster = new THREE.Raycaster();
@@ -217,14 +199,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 uiPlane.position.set(camera.position.x, camera.position.y + 2.5, camera.position.z - 50);
                 uiPlane.rotation.copy(camera.rotation);
             }
-
-            // --- NEW: Animation logic for shooting stars ---
+            
             if (shootingStars) {
                 shootingStars.geometry.attributes.position.array.forEach((_, i) => {
                     if (i % 3 === 1) { // y-coordinate
-                        shootingStars.geometry.attributes.position.array[i] -= 20; // Speed
+                        shootingStars.geometry.attributes.position.array[i] -= 20;
                         if (shootingStars.geometry.attributes.position.array[i] < -1000) {
-                            shootingStars.geometry.attributes.position.array[i] = 1000 + Math.random() * 1000; // Reset
+                            shootingStars.geometry.attributes.position.array[i] = 1000 + Math.random() * 1000;
                         }
                     }
                 });
@@ -248,16 +229,19 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
         
-        // --- MODIFIED: This function now only unmutes the ocean on the first click ---
-        function unlockAmbientAudio() {
-            if (oceanAudio.muted) {
-                oceanAudio.muted = false;
+        // --- MODIFIED: More robust audio handling for ambient sound ---
+        function startAmbientAudio() {
+            if (oceanAudio.paused) {
                 oceanAudio.volume = 0.2;
+                oceanAudio.muted = false;
+                // play() returns a promise, which we should handle
+                oceanAudio.play().catch(e => {
+                    console.error("Ocean audio could not be played on interaction:", e);
+                });
             }
         }
-        document.body.addEventListener('click', unlockAmbientAudio, { once: true });
+        document.body.addEventListener('click', startAmbientAudio, { once: true });
         
-        // --- MODIFIED: This function now ONLY toggles the music (sea shanty) ---
         function toggleMusic(event) {
             event.stopPropagation();
             if (wayfindersAudio.paused) {
