@@ -25,7 +25,8 @@
         body {
             display: flex; flex-direction: column; position: relative;
         }
-        #canvas-container {
+        /* MODIFIED: The canvas is now a direct child of body again */
+        #skybox-canvas {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%; z-index: 0;
         }
@@ -53,8 +54,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         </button>
     </div>
 
-    <!-- UI is now generated entirely in the 3D scene -->
-    <div id="canvas-container"></div>
+    <!-- REMOVED: All HTML UI, it is now generated entirely in the 3D scene -->
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
@@ -62,17 +62,14 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
         let galaxyTexture, uiPlane;
-        // --- An array to hold all clickable 3D objects ---
         const clickableObjects = [];
         
-        // --- REVERT to the original, successful 3D UI generation method ---
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
             const size = 1024;
             canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             
-            // --- MODIFIED: Use new font and colors on the canvas drawing ---
             context.strokeStyle = '#FFFFFF';
             context.fillStyle = '#FFFFFF';
             context.lineWidth = 4;
@@ -85,12 +82,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const topRowY = 80;
             const bottomRowY = topRowY + btnHeight + gap;
 
-            // Draw "Signatures" button
             context.font = "italic " + seaweedFont;
             context.strokeRect((size - btnWidthSignatures) / 2, topRowY, btnWidthSignatures, btnHeight);
             context.fillText("Signatures", size / 2, topRowY + btnHeight / 2 + 10);
 
-            // Draw "To be" and "To do" buttons
             context.font = seaweedFont;
             context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2, bottomRowY, btnWidthBottom, btnHeight);
             context.fillText("To be", (size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom / 2, bottomRowY + btnHeight / 2 + 10);
@@ -98,24 +93,22 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", (size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2 + 10);
 
             const texture = new THREE.CanvasTexture(canvas);
+            // --- MODIFIED: Increased opacity to make buttons much more visible ---
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.9 });
             const geometry = new THREE.PlaneGeometry(100, 50);
             
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
 
-            // --- Create invisible planes for clicking ---
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             
-            // Signatures button
             const sigGeo = new THREE.PlaneGeometry(51, 10);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
-            sigBtn.position.set(0, 7.5, 0.1); // Position relative to uiPlane
-            uiPlane.add(sigBtn); // Attach to uiPlane
+            sigBtn.position.set(0, 7.5, 0.1);
+            uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
-            // To be button
             const beGeo = new THREE.PlaneGeometry(24, 10);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
@@ -123,7 +116,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
-            // To do button
             const doGeo = new THREE.PlaneGeometry(24, 10);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
@@ -131,12 +123,11 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
-            // To do REFLECTION button
             const doRefGeo = new THREE.PlaneGeometry(24, 10);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
-            // This one is positioned independently in the world, not attached to uiPlane
-            doRefBtn.position.set(17, -58, -700);
+            // --- MODIFIED: Moved reflection button much closer to match UI plane ---
+            doRefBtn.position.set(15, -53, -400);
             scene.add(doRefBtn);
             clickableObjects.push(doRefBtn);
         }
@@ -144,15 +135,15 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- LOCKED BACKGROUND CAMERA ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
             camera.position.set(0, 50, 300);
             
-            const canvasContainer = document.getElementById('canvas-container');
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
             renderer.setSize(window.innerWidth, window.innerHeight);
-            canvasContainer.appendChild(renderer.domElement);
+            // --- MODIFIED: Reverted to original canvas injection method to fix header ---
+            document.body.insertBefore(renderer.domElement, document.body.firstChild);
+            renderer.domElement.id = 'skybox-canvas';
 
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', (t) => { scene.background = t; });
@@ -214,14 +205,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- LOCKED BACKGROUND ANIMATION ---
             camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
             camera.lookAt(0, 80, -1000); 
 
-            // Position the entire UI plane in the correct spot
             if (uiPlane) {
-                uiPlane.position.set(0, 85, -700);
+                // --- MODIFIED: Moved UI plane much closer to the camera ---
+                uiPlane.position.set(0, 60, -400);
                 uiPlane.lookAt(camera.position);
             }
 
