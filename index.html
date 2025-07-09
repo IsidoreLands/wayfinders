@@ -57,8 +57,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
+        // --- MODIFIED: Added reference for the skySphere mesh ---
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
-        let shootingStars;
+        let shootingStars, skySphere;
         let uiPlane, hiddenButton;
 
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
@@ -66,12 +67,12 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         
         function createStarfield() {
             const starGeometry = new THREE.BufferGeometry(), starCount = 50000, positions = [], colors = [], sizes = [];
-            const color = new THREE.Color(), radius = 2000;
+            const color = new THREE.Color(), radius = 4000; // Increased radius to prevent clipping with wider FOV
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = (Math.random()) * radius;
+                const y = (Math.random() - 0.5) * 2 * radius; // More vertical spread
                 const z = (Math.random() - 0.5) * 2 * radius;
-                if(Math.sqrt(x*x + (y-radius)*(y-radius) + z*z) > radius) continue;
+                if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.6, 0.1, 0.5 + Math.random() * 0.2);
                 colors.push(color.r, color.g, color.b);
@@ -91,14 +92,14 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const positions = [];
             for (let i = 0; i < starCount; i++) {
                 positions.push(
-                    (Math.random() - 0.5) * 4000,
-                    500 + Math.random() * 1500,
-                    (Math.random() - 0.5) * 4000
+                    (Math.random() - 0.5) * 6000,
+                    1000 + Math.random() * 2500,
+                    (Math.random() - 0.5) * 6000
                 );
             }
             starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             const starMat = new THREE.PointsMaterial({
-                color: 0x87CEEB, size: 8, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7
+                color: 0x87CEEB, size: 12, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7
             });
             shootingStars = new THREE.Points(starGeo, starMat);
             scene.add(shootingStars);
@@ -148,8 +149,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- MODIFIED: Widened the camera's Field of View (FOV) to 75 to "zoom out" ---
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
+            // --- MODIFIED: Dramatically widened the camera's FOV to 120 for a panoramic view ---
+            camera = new THREE.PerspectiveCamera(120, window.innerWidth / window.innerHeight, 1, 20000);
             camera.position.set(0, 2.5, 0);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -158,9 +159,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
-                const skySphereGeo = new THREE.SphereGeometry(8000, 60, 40);
+                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40); // Increased radius for safety
                 const skySphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
-                const skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
+                // --- MODIFIED: Assign the created mesh to the global variable ---
+                skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
                 scene.add(skySphere);
             });
 
@@ -198,13 +200,18 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             if (shootingStars) {
                 shootingStars.geometry.attributes.position.array.forEach((_, i) => {
                     if (i % 3 === 1) { // y-coordinate
-                        shootingStars.geometry.attributes.position.array[i] -= 20;
-                        if (shootingStars.geometry.attributes.position.array[i] < -1000) {
-                            shootingStars.geometry.attributes.position.array[i] = 1000 + Math.random() * 1000;
+                        shootingStars.geometry.attributes.position.array[i] -= 25; // Slightly faster
+                        if (shootingStars.geometry.attributes.position.array[i] < -2000) {
+                            shootingStars.geometry.attributes.position.array[i] = 2000 + Math.random() * 2000;
                         }
                     }
                 });
                 shootingStars.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // --- NEW: Added slow rotation to the celestial sphere ---
+            if (skySphere) {
+                skySphere.rotation.y -= 0.0003;
             }
 
             if (starfield) starfield.rotation.y = elapsedTime * 0.01;
