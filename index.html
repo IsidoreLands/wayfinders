@@ -6,7 +6,7 @@
     <title>Wayfinders | OODA WIKI</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -79,10 +79,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", (uiWidth - totalBottomWidth) / 2 + buttonWidth + gap + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.8 });
-            const geometry = new THREE.PlaneGeometry(uiWidth / 25, uiHeight / 25);
+            const geometry = new THREE.PlaneGeometry(uiWidth / 20, uiHeight / 20); // Larger UI
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
-            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 25, buttonHeight / 25);
+            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 20, buttonHeight / 20);
             const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
             scene.add(hiddenButton);
@@ -102,8 +102,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 30, 150);
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
+            camera.position.set(0, 50, 250);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
@@ -118,13 +118,12 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             
             // Layer 2: The scrolling galaxy plane
             galaxyTexture = textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
-                texture.wrapS = THREE.RepeatWrapping; // Allow horizontal repeating
-                texture.wrapT = THREE.RepeatWrapping; // Allow vertical repeating (for sway)
+                texture.wrapS = THREE.RepeatWrapping;
             });
-            const galaxyGeo = new THREE.PlaneGeometry(8000, 2000); // A wide plane
-            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true });
+            const galaxyGeo = new THREE.PlaneGeometry(10000, 2500); // A very wide plane
+            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, opacity: 0.9 });
             const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
-            galaxyPlane.position.set(0, 150, -2000); // Position it far away and high up
+            galaxyPlane.position.set(0, 400, -3000); // Position high and far
             scene.add(galaxyPlane);
 
             // Layer 3: The ocean
@@ -136,6 +135,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 waterColor: 0x001e0f, distortionScale: 3.7, fog: true
             });
             ocean.rotation.x = -Math.PI / 2;
+            ocean.position.y = -10; // Keep ocean low
             scene.add(ocean);
             
             createInteractive3DUI();
@@ -149,20 +149,20 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Aim camera high to keep horizon in bottom third
-            camera.position.y = 30 + Math.sin(elapsedTime * 0.4) * 3;
-            camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
-            camera.lookAt(0, 45, -1000); // Look high into the sky
+            // Camera aims high, pushing the horizon line down into the bottom third.
+            camera.position.y = 40 + Math.sin(elapsedTime * 0.3) * 5;
+            camera.position.x = Math.cos(elapsedTime * 0.2) * 10;
+            camera.lookAt(0, 100, -1000); 
 
             if (galaxyTexture) {
-                galaxyTexture.offset.x -= 0.00005; // Very slow, majestic scroll
+                galaxyTexture.offset.x -= 0.00008; // Gentle scrolling speed
             }
 
             if (uiPlane) {
-                uiPlane.position.set(0, 80, -700);
+                uiPlane.position.set(0, 150, -800);
                 uiPlane.lookAt(camera.position);
 
-                hiddenButton.position.set(11, 0, -700);
+                hiddenButton.position.set(13.5, -10, -800);
             }
 
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
