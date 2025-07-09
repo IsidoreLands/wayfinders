@@ -9,7 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     
-    <!-- Step 1: REMOVE OrbitControls.js. It is no longer needed. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
 
@@ -18,6 +17,7 @@
             --background-color: #000000;
             --accent-color: #00FF00;
             --muted-color: #555555;
+            --lantern-glow: #ffc300;
         }
         html, body {
             height: 100%; margin: 0;
@@ -34,29 +34,71 @@
         #header {
             display: flex; align-items: center; min-height: 80px;
             padding: 0; background-color: var(--background-color);
-            position: relative; z-index: 1;
+            position: relative; z-index: 2; /* Header above taffrail */
         }
-        /* ... other UI styles remain the same ... */
-        #logo {
-            max-height: 100%; max-width: 20%; height: auto;
-            margin-left: 20px; overflow: hidden;
+        #logo, #black-strip, #audio-controls { /* UI styles unchanged */
+            max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden;
         }
-        @media (max-width: 768px) {
-            #logo { max-width: 40%; max-height: 60px; }
-            #header { min-height: 60px; }
-        }
-        #black-strip {
-            flex-grow: 1; height: 100%; background-color: var(--background-color);
-        }
+        #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); margin-left: 0;}
         #audio-controls {
-            background: none; border: none; padding: 10px;
-            margin-right: 15px; cursor: pointer;
-            color: var(--muted-color); transition: color 0.2s ease-in-out;
+            background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); transition: color 0.2s ease-in-out;
         }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
-        #audio-controls:focus-visible {
-            outline: 2px solid var(--accent-color); outline-offset: 2px;
+        #audio-controls:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+        @media (max-width: 768px) { #logo { max-width: 40%; max-height: 60px; } #header { min-height: 60px; } }
+
+        /* --- Step 1: Taffrail Overlay Styles --- */
+        #taffrail-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 35vh; /* Adjust height as needed */
+            z-index: 1; /* Above canvas, below header */
+            pointer-events: none; /* Allow clicks to pass through to canvas unless on an interactive element */
+        }
+        #taffrail-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image covers the area */
+            object-position: center bottom;
+        }
+        .lantern {
+            position: absolute;
+            bottom: 22vh; /* Adjust vertical position */
+            width: 100px; /* Adjust size */
+            height: 150px; /* Adjust size */
+            pointer-events: auto; /* Make lanterns clickable */
+        }
+        #lit-lantern {
+            left: 25%; /* Adjust horizontal position */
+        }
+        .flame {
+            position: absolute;
+            bottom: 25px; /* Position flame inside lantern */
+            left: 20px;
+            width: 60px;
+            opacity: 1;
+        }
+        /* Flickering animation for the flame */
+        .flame-1 { animation: flicker 0.15s infinite alternate; }
+        .flame-2 { animation: flicker 0.2s infinite alternate-reverse; opacity: 0.8; }
+        @keyframes flicker {
+            from { opacity: 0.7; transform: scale(1, 1); }
+            to { opacity: 1; transform: scale(1.05, 1.1); }
+        }
+        #unlit-lantern {
+            right: 25%; /* Adjust horizontal position */
+            background-image: url('https://i.imgur.com/your-unlit-lantern.png'); /* Replace with your unlit lantern image */
+            background-size: contain;
+            background-repeat: no-repeat;
+            cursor: pointer;
+            transition: filter 0.3s ease;
+        }
+        #unlit-lantern:hover {
+            /* Create a glow effect on hover */
+            filter: drop-shadow(0 0 15px var(--lantern-glow)) brightness(1.2);
         }
     </style>
 </head>
@@ -70,27 +112,30 @@
         </button>
     </div>
     
+    <div id="taffrail-container">
+        <img id="taffrail-image" src="https://i.imgur.com/your-taffrail.png" alt="Ship Taffrail"> <div id="lit-lantern" class="lantern">
+            <img class="flame flame-1" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/flame-png-transparent-3.png" alt="Flame">
+            <img class="flame flame-2" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/flame-png-transparent-4.png" alt="Flame">
+        </div>
+
+        <a id="unlit-lantern" class="lantern" href="mailto:your-address@example.com?subject=Wayfinders%20Inquiry" title="Send Inquiry">
+            </a>
+    </div>
+
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
 
     <script>
-        // --- Three.js Scene Setup ---
+        // --- Three.js Scene Setup (Unchanged from previous version) ---
         let scene, camera, renderer, starMaterial, ocean, clock;
-
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
         const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
-
         function createStarfield() {
             const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = [];
             const color = new THREE.Color(), radius = 1000;
             for (let i = 0; i < starCount; i++) {
-                const x = (Math.random() - 0.5) * 2 * radius;
-                const y = (Math.random() - 0.5) * 2 * radius;
-                const z = (Math.random() - 0.5) * 2 * radius;
-                
-                // Step 2: Constrain stars to the upper hemisphere
-                if (y < 0) continue; 
-                
+                const x = (Math.random() - 0.5) * 2 * radius, y = (Math.random() - 0.5) * 2 * radius, z = (Math.random() - 0.5) * 2 * radius;
+                if (y < 0) continue;
                 if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5);
@@ -104,88 +149,54 @@
             const starfield = new THREE.Points(starGeometry, starMaterial);
             scene.add(starfield);
         }
-
         function init() {
-            clock = new THREE.Clock(); // Clock for smooth animation timing
-            scene = new THREE.Scene();
+            clock = new THREE.Clock(); scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 5, 50); // Fixed position resembling a boat deck
-
+            camera.position.set(0, 5, 50);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
-            
             const loader = new THREE.CubeTextureLoader();
             const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
             scene.background = texture;
-
             const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
-            ocean = new THREE.Water(waterGeometry, {
-                textureWidth: 512, textureHeight: 512,
-                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }),
-                sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
-                waterColor: 0x001e0f, distortionScale: 3.7,
-                fog: scene.fog !== undefined
-            });
+            ocean = new THREE.Water(waterGeometry, { textureWidth: 512, textureHeight: 512, waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }), sunDirection: new THREE.Vector3(), sunColor: 0xffffff, waterColor: 0x001e0f, distortionScale: 3.7, fog: scene.fog !== undefined });
             ocean.rotation.x = -Math.PI / 2;
             scene.add(ocean);
-
             createStarfield();
         }
-
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            const elapsedTime = clock.getElapsedTime();
-
-            // Step 3: Programmatic camera movement to simulate boat sway and sky rotation
-            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 0.5; // Gentle up-down bobbing
-            camera.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02;   // Gentle side-to-side roll
-            camera.rotation.y = elapsedTime * 0.01; // Slow, constant rotation of the view
-
+            const delta = clock.getDelta(), elapsedTime = clock.getElapsedTime();
+            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 0.5;
+            camera.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02;
+            camera.rotation.y = elapsedTime * 0.01;
             if (starMaterial) starMaterial.uniforms['time'].value += delta;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
-
             renderer.render(scene, camera);
         }
-
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
         window.addEventListener('resize', onWindowResize, false);
-        
-        init();
-        animate();
+        init(); animate();
 
-        // --- Audio Control Logic ---
-        const wayfindersAudio = document.getElementById('wayfindersAudio');
-        const oceanAudio = document.getElementById('oceanAudio');
-        const audioControl = document.getElementById('audio-controls');
+        // --- Audio Control Logic (Unchanged) ---
+        const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
-        
-        // Step 4: Decouple ambient audio from the toggle button
-        function unlockAmbientAudio() {
-            oceanAudio.volume = 0.2;
-            oceanAudio.play().catch(e => console.error("Ocean audio failed to play:", e));
-        }
+        function unlockAmbientAudio() { oceanAudio.volume = 0.2; oceanAudio.play().catch(e => console.error("Ocean audio failed to play:", e)); }
         document.body.addEventListener('click', unlockAmbientAudio, { once: true });
-
-        // Step 5: The toggle now ONLY controls the sea shanty
         function toggleShanty() {
-            // First click on THIS button should also unlock the ocean audio if it hasn't been already
-            unlockAmbientAudio(); 
-            
+            unlockAmbientAudio();
             if (wayfindersAudio.paused) {
                 wayfindersAudio.play().catch(e => console.error("Shanty audio failed to play:", e));
-                audioControl.classList.add('playing');
-                iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none';
+                audioControl.classList.add('playing'); iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none';
             } else {
                 wayfindersAudio.pause();
-                audioControl.classList.remove('playing');
-                iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block';
+                audioControl.classList.remove('playing'); iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block';
             }
         }
         audioControl.addEventListener('click', toggleShanty);
