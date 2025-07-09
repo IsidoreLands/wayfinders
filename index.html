@@ -9,8 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     
+    <!-- Step 1: Add Three.js and new Water.js dependency -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
 
     <style>
         :root {
@@ -68,88 +70,42 @@
         </button>
     </div>
     
+    <!-- Step 2: Add the new audio element for ambient ocean sounds -->
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
-    
+    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
+
     <script>
-        let scene, camera, renderer, controls, starMaterial;
+        // --- Three.js Scene Setup ---
+        let scene, camera, renderer, controls, starMaterial, ocean;
 
-        // --- Shaders for the starfield ---
-        const vertexShader = `
-            attribute float size;
-            attribute vec3 customColor;
-            varying vec3 vColor;
-            void main() {
-                vColor = customColor;
-                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                gl_PointSize = size * (300.0 / -mvPosition.z);
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `;
-        const fragmentShader = `
-            uniform vec3 color;
-            uniform sampler2D pointTexture;
-            uniform float time;
-            varying vec3 vColor;
-            void main() {
-                float intensity = sin(time * 0.5 + vColor.r * 100.0); // Use color to create offset twinkle
-                float twinkle = 0.6 + 0.4 * intensity;
-                gl_FragColor = vec4(vColor * color, twinkle);
-                gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord);
-            }
-        `;
+        const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
+        const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
 
-        function createStarfield() {
-            const starGeometry = new THREE.BufferGeometry();
-            const starCount = 20000;
-            const positions = [];
-            const colors = [];
-            const sizes = [];
-
-            const color = new THREE.Color();
-            const radius = 1000;
-
+        function createStarfield() { /* This function remains unchanged from the previous version */
+            const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = [];
+            const color = new THREE.Color(), radius = 1000;
             for (let i = 0; i < starCount; i++) {
-                // Position stars randomly in a sphere for depth
-                const x = (Math.random() - 0.5) * 2 * radius;
-                const y = (Math.random() - 0.5) * 2 * radius;
-                const z = (Math.random() - 0.5) * 2 * radius;
-                if(Math.sqrt(x*x + y*y + z*z) > radius) continue; // Keep them within a sphere
+                const x = (Math.random() - 0.5) * 2 * radius, y = (Math.random() - 0.5) * 2 * radius, z = (Math.random() - 0.5) * 2 * radius;
+                if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
                 positions.push(x, y, z);
-
-                // Assign varied colors/brightness (white, pale blue, pale yellow)
-                color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5); // HSL for color variation
+                color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5);
                 colors.push(color.r, color.g, color.b);
-
-                // Assign varied sizes
                 sizes.push(Math.random() * 5 + 5);
             }
-
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
             starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-
-            // The material that uses our custom shaders
-            starMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    color: { value: new THREE.Color(0xffffff) },
-                    pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') },
-                    time: { value: 1.0 }
-                },
-                vertexShader,
-                fragmentShader,
-                blending: THREE.AdditiveBlending, // Makes stars glow
-                depthTest: false,
-                transparent: true
-            });
-
+            starMaterial = new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') }, time: { value: 1.0 } }, vertexShader, fragmentShader, blending: THREE.AdditiveBlending, depthTest: false, transparent: true });
             const starfield = new THREE.Points(starGeometry, starMaterial);
             scene.add(starfield);
         }
 
         function init() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 3000);
-            camera.position.z = 1; // Start inside the starfield
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
+            
+            // Step 3: Adjust camera position to be above the ocean, looking at the horizon
+            camera.position.set(0, 30, 200);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -160,20 +116,34 @@
             controls.enableZoom = false; controls.enablePan = false;
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.1; // Slower rotation for a more epic feel
+            controls.autoRotateSpeed = 0.05; // Slower rotation
+            controls.maxPolarAngle = Math.PI * 0.55; // Prevent camera from going below the ocean
+            controls.target.set(0, 15, 0); // Aim camera slightly up at the horizon
 
-            // Skybox (unchanged)
-            const imagePrefix = "https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/purplenebula_";
-            const directions  = ["ft", "bk", "up", "dn", "rt", "lf"];
-            const imageSuffix = ".png";
-            const materialArray = [];
-            for (let i = 0; i < 6; i++) {
-                materialArray.push( new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load(imagePrefix + directions[i] + imageSuffix), side: THREE.BackSide }));
-            }
-            const skybox = new THREE.Mesh(new THREE.BoxGeometry(2000, 2000, 2000), materialArray);
+            // Skybox
+            const skybox = new THREE.Mesh(new THREE.BoxGeometry(10000, 10000, 10000), []); // Will be loaded below
             scene.add(skybox);
+            const loader = new THREE.CubeTextureLoader();
+            const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
+            scene.background = texture;
 
-            // Add the new dynamic starfield
+            // Step 4: Create the Ocean
+            const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+            ocean = new THREE.Water(waterGeometry, {
+                textureWidth: 512,
+                textureHeight: 512,
+                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) {
+                    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                }),
+                sunDirection: new THREE.Vector3(),
+                sunColor: 0xffffff,
+                waterColor: 0x001e0f, // Dark green/blue water color
+                distortionScale: 3.7,
+                fog: scene.fog !== undefined
+            });
+            ocean.rotation.x = -Math.PI / 2; // Orient the plane to be flat
+            scene.add(ocean);
+
             createStarfield();
         }
 
@@ -181,10 +151,8 @@
             requestAnimationFrame(animate);
             controls.update();
             
-            // Update the time uniform for the twinkling shader
-            if (starMaterial) {
-                starMaterial.uniforms.time.value += 0.01;
-            }
+            if (starMaterial) starMaterial.uniforms['time'].value += 0.01;
+            if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0; // Animate the ocean waves
 
             renderer.render(scene, camera);
         }
@@ -194,23 +162,35 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
-
         window.addEventListener('resize', onWindowResize, false);
         
         init();
         animate();
 
-        // --- Audio Control Logic (Unchanged) ---
-        const audio = document.getElementById('wayfindersAudio'), audioControl = document.getElementById('audio-controls');
+        // --- Audio Control Logic ---
+        const wayfindersAudio = document.getElementById('wayfindersAudio');
+        const oceanAudio = document.getElementById('oceanAudio'); // Get the new audio element
+        const audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
         let isAudioUnlocked = false;
+
         function toggleAudio() {
-            if (!isAudioUnlocked) { audio.play().catch(()=>{}); isAudioUnlocked = true; }
-            if (audio.paused) {
-                audio.play(); audioControl.classList.add('playing');
+            // Step 5: On first interaction, unlock and play BOTH audio tracks
+            if (!isAudioUnlocked) {
+                oceanAudio.volume = 0.2; // Set low volume for ambient sound
+                oceanAudio.play().catch(()=>{});
+                wayfindersAudio.play().catch(()=>{});
+                isAudioUnlocked = true;
+            }
+
+            // This part now only controls the main shanty
+            if (wayfindersAudio.paused) {
+                wayfindersAudio.play();
+                audioControl.classList.add('playing');
                 iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none';
             } else {
-                audio.pause(); audioControl.classList.remove('playing');
+                wayfindersAudio.pause();
+                audioControl.classList.remove('playing');
                 iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block';
             }
         }
