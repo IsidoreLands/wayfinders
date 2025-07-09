@@ -6,7 +6,7 @@
     <title>Wayfinders | OODA WIKI</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -18,6 +18,9 @@
             --accent-color: #00FF00;
             --muted-color: #555555;
             --lantern-glow: #ffc300;
+            --metal-dark: #222;
+            --metal-light: #444;
+            --glass-color: rgba(255, 245, 200, 0.1);
         }
         html, body {
             height: 100%; margin: 0;
@@ -28,77 +31,98 @@
         }
         #skybox-canvas {
             position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
+            width: 100%; height: 100%; z-index: 0;
         }
         #header {
-            display: flex; align-items: center; min-height: 80px;
-            padding: 0; background-color: var(--background-color);
-            position: relative; z-index: 2; /* Header above taffrail */
+            display: flex; align-items: center; min-height: 80px; padding: 0;
+            background-color: var(--background-color); position: relative; z-index: 2;
         }
-        #logo, #black-strip, #audio-controls { /* UI styles unchanged */
-            max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden;
-        }
-        #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); margin-left: 0;}
-        #audio-controls {
-            background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); transition: color 0.2s ease-in-out;
-        }
+        #logo { max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden; }
+        #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); }
+        #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); transition: color 0.2s ease-in-out; }
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
         #audio-controls:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
         @media (max-width: 768px) { #logo { max-width: 40%; max-height: 60px; } #header { min-height: 60px; } }
 
-        /* --- Step 1: Taffrail Overlay Styles --- */
         #taffrail-container {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 35vh; /* Adjust height as needed */
-            z-index: 1; /* Above canvas, below header */
-            pointer-events: none; /* Allow clicks to pass through to canvas unless on an interactive element */
+            position: fixed; bottom: -5vh; left: 0;
+            width: 100%; height: 35vh;
+            z-index: 1; pointer-events: none;
+            perspective: 500px;
         }
-        #taffrail-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensures the image covers the area */
-            object-position: center bottom;
+        #taffrail-segments { display: flex; width: 100%; height: 100%; transform-style: preserve-3d; }
+        .taffrail-segment {
+            flex: 1 1 0px;
+            background-image: url('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/taffrail-texture.png');
+            background-size: 1000% 100%; background-repeat: no-repeat;
         }
+        .taffrail-segment:nth-child(1)  { background-position: 0% 0;    transform: rotateY(35deg) translateZ(-40px); }
+        .taffrail-segment:nth-child(2)  { background-position: 11.1% 0;  transform: rotateY(25deg) translateZ(-20px); }
+        .taffrail-segment:nth-child(3)  { background-position: 22.2% 0;  transform: rotateY(15deg) translateZ(-5px); }
+        .taffrail-segment:nth-child(4)  { background-position: 33.3% 0;  transform: rotateY(5deg); }
+        .taffrail-segment:nth-child(5)  { background-position: 44.4% 0;  transform: rotateY(0deg); }
+        .taffrail-segment:nth-child(6)  { background-position: 55.5% 0;  transform: rotateY(-5deg); }
+        .taffrail-segment:nth-child(7)  { background-position: 66.6% 0;  transform: rotateY(-15deg) translateZ(-5px); }
+        .taffrail-segment:nth-child(8)  { background-position: 77.7% 0;  transform: rotateY(-25deg) translateZ(-20px); }
+        .taffrail-segment:nth-child(9)  { background-position: 88.8% 0;  transform: rotateY(-35deg) translateZ(-40px); }
+        .taffrail-segment:nth-child(10) { background-position: 100% 0;   transform: rotateY(-45deg) translateZ(-60px); }
+
+        /* --- Step 1: Programmatic CSS Lantern --- */
         .lantern {
             position: absolute;
-            bottom: 22vh; /* Adjust vertical position */
-            width: 100px; /* Adjust size */
-            height: 150px; /* Adjust size */
-            pointer-events: auto; /* Make lanterns clickable */
+            bottom: 25vh;
+            width: 80px; height: 120px;
+            pointer-events: auto;
+            transform: translateZ(5px);
         }
-        #lit-lantern {
-            left: 25%; /* Adjust horizontal position */
-        }
-        .flame {
+        .lantern-frame {
             position: absolute;
-            bottom: 25px; /* Position flame inside lantern */
-            left: 20px;
-            width: 60px;
-            opacity: 1;
+            width: 100%; height: 100%;
+            border: 4px solid var(--metal-dark);
+            border-radius: 3px;
+            background: linear-gradient(var(--metal-light), var(--metal-dark));
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
         }
-        /* Flickering animation for the flame */
+        .lantern-top, .lantern-base {
+            position: absolute; left: -10%;
+            width: 120%; height: 15%;
+            background: linear-gradient(var(--metal-light), var(--metal-dark));
+            border-radius: 2px;
+        }
+        .lantern-top { top: -10%; }
+        .lantern-base { bottom: -10%; }
+        .lantern-glass {
+            position: absolute;
+            top: 10%; left: 10%;
+            width: 80%; height: 80%;
+            background: var(--glass-color);
+        }
+        
+        #lit-lantern { left: 28%; }
+        .flame {
+            position: absolute; bottom: 20px; left: 10px;
+            width: 60px; z-index: 5;
+        }
         .flame-1 { animation: flicker 0.15s infinite alternate; }
         .flame-2 { animation: flicker 0.2s infinite alternate-reverse; opacity: 0.8; }
         @keyframes flicker {
             from { opacity: 0.7; transform: scale(1, 1); }
             to { opacity: 1; transform: scale(1.05, 1.1); }
         }
+
         #unlit-lantern {
-            right: 25%; /* Adjust horizontal position */
-            background-image: url('https://i.imgur.com/your-unlit-lantern.png'); /* Replace with your unlit lantern image */
-            background-size: contain;
-            background-repeat: no-repeat;
+            right: 28%;
             cursor: pointer;
-            transition: filter 0.3s ease;
+            transition: all 0.3s ease;
         }
         #unlit-lantern:hover {
-            /* Create a glow effect on hover */
-            filter: drop-shadow(0 0 15px var(--lantern-glow)) brightness(1.2);
+            /* On hover, add a glow to the whole lantern and light up the glass */
+            filter: drop-shadow(0 0 15px var(--lantern-glow));
+        }
+        #unlit-lantern:hover .lantern-glass {
+            background: rgba(255, 195, 0, 0.3);
+            box-shadow: inset 0 0 10px var(--lantern-glow);
         }
     </style>
 </head>
@@ -113,93 +137,41 @@
     </div>
     
     <div id="taffrail-container">
-        <img id="taffrail-image" src="https://i.imgur.com/your-taffrail.png" alt="Ship Taffrail"> <div id="lit-lantern" class="lantern">
+        <div id="taffrail-segments">
+            <div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div><div class="taffrail-segment"></div>
+        </div>
+        
+        <!-- Step 2: Replace image-based lanterns with CSS structures -->
+        <div id="lit-lantern" class="lantern">
+            <div class="lantern-top"></div>
+            <div class="lantern-frame">
+                <div class="lantern-glass"></div>
+            </div>
+            <div class="lantern-base"></div>
+            <!-- Flame images are placed inside the CSS lantern -->
             <img class="flame flame-1" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/flame-png-transparent-3.png" alt="Flame">
             <img class="flame flame-2" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/flame-png-transparent-4.png" alt="Flame">
         </div>
 
         <a id="unlit-lantern" class="lantern" href="mailto:your-address@example.com?subject=Wayfinders%20Inquiry" title="Send Inquiry">
-            </a>
+            <div class="lantern-top"></div>
+            <div class="lantern-frame">
+                <div class="lantern-glass"></div>
+            </div>
+            <div class="lantern-base"></div>
+        </a>
     </div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
 
     <script>
-        // --- Three.js Scene Setup (Unchanged from previous version) ---
-        let scene, camera, renderer, starMaterial, ocean, clock;
-        const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
-        const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
-        function createStarfield() {
-            const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = [];
-            const color = new THREE.Color(), radius = 1000;
-            for (let i = 0; i < starCount; i++) {
-                const x = (Math.random() - 0.5) * 2 * radius, y = (Math.random() - 0.5) * 2 * radius, z = (Math.random() - 0.5) * 2 * radius;
-                if (y < 0) continue;
-                if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
-                positions.push(x, y, z);
-                color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5);
-                colors.push(color.r, color.g, color.b);
-                sizes.push(Math.random() * 5 + 5);
-            }
-            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
-            starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-            starMaterial = new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') }, time: { value: 1.0 } }, vertexShader, fragmentShader, blending: THREE.AdditiveBlending, depthTest: false, transparent: true });
-            const starfield = new THREE.Points(starGeometry, starMaterial);
-            scene.add(starfield);
-        }
-        function init() {
-            clock = new THREE.Clock(); scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 5, 50);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.domElement.id = 'skybox-canvas';
-            document.body.insertBefore(renderer.domElement, document.body.firstChild);
-            const loader = new THREE.CubeTextureLoader();
-            const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
-            scene.background = texture;
-            const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
-            ocean = new THREE.Water(waterGeometry, { textureWidth: 512, textureHeight: 512, waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }), sunDirection: new THREE.Vector3(), sunColor: 0xffffff, waterColor: 0x001e0f, distortionScale: 3.7, fog: scene.fog !== undefined });
-            ocean.rotation.x = -Math.PI / 2;
-            scene.add(ocean);
-            createStarfield();
-        }
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta(), elapsedTime = clock.getElapsedTime();
-            camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 0.5;
-            camera.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02;
-            camera.rotation.y = elapsedTime * 0.01;
-            if (starMaterial) starMaterial.uniforms['time'].value += delta;
-            if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
-            renderer.render(scene, camera);
-        }
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        window.addEventListener('resize', onWindowResize, false);
-        init(); animate();
-
-        // --- Audio Control Logic (Unchanged) ---
-        const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
-        const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
-        function unlockAmbientAudio() { oceanAudio.volume = 0.2; oceanAudio.play().catch(e => console.error("Ocean audio failed to play:", e)); }
-        document.body.addEventListener('click', unlockAmbientAudio, { once: true });
-        function toggleShanty() {
-            unlockAmbientAudio();
-            if (wayfindersAudio.paused) {
-                wayfindersAudio.play().catch(e => console.error("Shanty audio failed to play:", e));
-                audioControl.classList.add('playing'); iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none';
-            } else {
-                wayfindersAudio.pause();
-                audioControl.classList.remove('playing'); iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block';
-            }
-        }
-        audioControl.addEventListener('click', toggleShanty);
+        // All JavaScript is unchanged.
+        let scene, camera, renderer, starMaterial, ocean, clock; const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`; const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`; function createStarfield() { const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = []; const color = new THREE.Color(), radius = 1000; for (let i = 0; i < starCount; i++) { const x = (Math.random() - 0.5) * 2 * radius, y = (Math.random() - 0.5) * 2 * radius, z = (Math.random() - 0.5) * 2 * radius; if (y < 0) continue; if(Math.sqrt(x*x + y*y + z*z) > radius) continue; positions.push(x, y, z); color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5); colors.push(color.r, color.g, color.b); sizes.push(Math.random() * 5 + 5); } starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3)); starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1)); starMaterial = new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') }, time: { value: 1.0 } }, vertexShader, fragmentShader, blending: THREE.AdditiveBlending, depthTest: false, transparent: true }); const starfield = new THREE.Points(starGeometry, starMaterial); scene.add(starfield); }
+        function init() { clock = new THREE.Clock(); scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000); camera.position.set(0, 5, 50); renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight); renderer.domElement.id = 'skybox-canvas'; document.body.insertBefore(renderer.domElement, document.body.firstChild); const loader = new THREE.CubeTextureLoader(); const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']); scene.background = texture; const waterGeometry = new THREE.PlaneGeometry(10000, 10000); ocean = new THREE.Water(waterGeometry, { textureWidth: 512, textureHeight: 512, waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }), sunDirection: new THREE.Vector3(), sunColor: 0xffffff, waterColor: 0x001e0f, distortionScale: 3.7, fog: scene.fog !== undefined }); ocean.rotation.x = -Math.PI / 2; scene.add(ocean); createStarfield(); }
+        function animate() { requestAnimationFrame(animate); const delta = clock.getDelta(), elapsedTime = clock.getElapsedTime(); camera.position.y = 5 + Math.sin(elapsedTime * 0.5) * 0.5; camera.rotation.z = Math.sin(elapsedTime * 0.3) * 0.02; camera.rotation.y = elapsedTime * 0.01; if (starMaterial) starMaterial.uniforms['time'].value += delta; if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0; renderer.render(scene, camera); }
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } window.addEventListener('resize', onWindowResize, false); init(); animate();
+        const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls'); const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted'); function unlockAmbientAudio() { oceanAudio.volume = 0.2; oceanAudio.play().catch(e => console.error("Ocean audio failed to play:", e)); } document.body.addEventListener('click', unlockAmbientAudio, { once: true }); function toggleShanty() { unlockAmbientAudio(); if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Shanty audio failed to play:", e)); audioControl.classList.add('playing'); iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none'; } else { wayfindersAudio.pause(); audioControl.classList.remove('playing'); iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block'; } } audioControl.addEventListener('click', toggleShanty);
     </script>
 </body>
 </html>
