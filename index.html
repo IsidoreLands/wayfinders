@@ -25,7 +25,6 @@
         body {
             display: flex; flex-direction: column; position: relative;
         }
-        /* MODIFIED: The canvas is now a direct child of body again */
         #skybox-canvas {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%; z-index: 0;
@@ -53,8 +52,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>
         </button>
     </div>
-
-    <!-- REMOVED: All HTML UI, it is now generated entirely in the 3D scene -->
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
@@ -93,41 +90,41 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", (size - (btnWidthBottom * 2 + gap)) / 2 + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2 + 10);
 
             const texture = new THREE.CanvasTexture(canvas);
-            // --- MODIFIED: Increased opacity to make buttons much more visible ---
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.9 });
-            const geometry = new THREE.PlaneGeometry(100, 50);
+            // --- MODIFIED: Made the plane larger so it's readable when closer ---
+            const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
 
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             
-            const sigGeo = new THREE.PlaneGeometry(51, 10);
+            // --- MODIFIED: Increased size of clickable planes to match new UI scale ---
+            const sigGeo = new THREE.PlaneGeometry(60, 12);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
-            sigBtn.position.set(0, 7.5, 0.1);
+            sigBtn.position.set(0, 9, 0.1);
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
-            const beGeo = new THREE.PlaneGeometry(24, 10);
+            const beGeo = new THREE.PlaneGeometry(29, 12);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
-            beBtn.position.set(-15, -9.5, 0.1);
+            beBtn.position.set(-18, -11, 0.1);
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
-            const doGeo = new THREE.PlaneGeometry(24, 10);
+            const doGeo = new THREE.PlaneGeometry(29, 12);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
-            doBtn.position.set(15, -9.5, 0.1);
+            doBtn.position.set(18, -11, 0.1);
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
-            const doRefGeo = new THREE.PlaneGeometry(24, 10);
+            const doRefGeo = new THREE.PlaneGeometry(29, 12);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
-            // --- MODIFIED: Moved reflection button much closer to match UI plane ---
-            doRefBtn.position.set(15, -53, -400);
+            // This is positioned independently and will be updated in the animate loop
             scene.add(doRefBtn);
             clickableObjects.push(doRefBtn);
         }
@@ -141,7 +138,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // --- MODIFIED: Reverted to original canvas injection method to fix header ---
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
             renderer.domElement.id = 'skybox-canvas';
 
@@ -179,7 +175,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(clickableObjects);
+            const intersects = raycaster.intersectObjects(clickableObjects, true); // true for recursive
 
             if (intersects.length > 0) {
                 const clickedName = intersects[0].object.name;
@@ -205,14 +201,29 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
+            // --- LOCKED BACKGROUND ANIMATION ---
             camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
             camera.lookAt(0, 80, -1000); 
 
+            // --- MODIFIED: UI plane position is now relative to the camera ---
             if (uiPlane) {
-                // --- MODIFIED: Moved UI plane much closer to the camera ---
-                uiPlane.position.set(0, 60, -400);
+                // This keeps the UI at a fixed distance and position in front of the camera.
+                uiPlane.position.set(
+                    camera.position.x,
+                    camera.position.y + 25,
+                    camera.position.z - 150
+                );
                 uiPlane.lookAt(camera.position);
+
+                // --- MODIFIED: The reflection button's position must be calculated ---
+                const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
+                if (reflectionButton) {
+                    const todoButton = clickableObjects.find(o => o.name === 'todo');
+                    const worldPos = new THREE.Vector3();
+                    todoButton.getWorldPosition(worldPos); // Get the world position of the real button
+                    reflectionButton.position.set(worldPos.x, -worldPos.y, worldPos.z); // Set reflection to the same X/Z but inverse Y
+                }
             }
 
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
