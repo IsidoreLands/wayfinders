@@ -15,7 +15,6 @@
     <style>
         :root {
             --background-color: #000000;
-            /* --accent-color is no longer used for the 3D UI, but kept for audio controls */
             --accent-color: #00FF00;
             --muted-color: #555555;
         }
@@ -55,36 +54,77 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     </div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
-    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
+    <!-- MODIFIED: Added autoplay and muted attributes to ocean audio -->
+    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop autoplay muted></audio>
 
     <script>
+        // --- NEW: Added references for new particle systems ---
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
-        let uiPlane, hiddenButton; // References to our new 3D UI objects
+        let shootingStars, distantGalaxies1, distantGalaxies2;
+        let uiPlane, hiddenButton;
 
-        const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix
-* mvPosition; }`;
-        const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 0.5 + vColor.r * 100.0); float twinkle = 0.6 + 0.4 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
-
+        const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
+        const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 2.0 + vColor.r * 100.0); float twinkle = 0.5 + 0.5 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
+        
+        // --- MODIFIED: Increased star count for a denser field ---
         function createStarfield() {
-            const starGeometry = new THREE.BufferGeometry(), starCount = 20000, positions = [], colors = [], sizes = [];
-            const color = new THREE.Color(), radius = 1000;
+            const starGeometry = new THREE.BufferGeometry(), starCount = 50000, positions = [], colors = [], sizes = [];
+            const color = new THREE.Color(), radius = 2000;
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = 50 + Math.random() * radius; 
+                const y = (Math.random()) * radius; // Spread stars more vertically
                 const z = (Math.random() - 0.5) * 2 * radius;
-                if(Math.sqrt(x*x + (y-50-radius)*(y-50-radius) + z*z) > radius) continue;
+                if(Math.sqrt(x*x + (y-radius)*(y-radius) + z*z) > radius) continue;
                 positions.push(x, y, z);
-                color.setHSL(0.55, 0.2, 0.5 + Math.random() * 0.5);
+                color.setHSL(0.6, 0.1, 0.5 + Math.random() * 0.2);
                 colors.push(color.r, color.g, color.b);
-                sizes.push(Math.random() * 5 + 5);
+                sizes.push(Math.random() * 3 + 2);
             }
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
             starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-            starMaterial = new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') }, time: { value: 1.0
-} }, vertexShader, fragmentShader, blending: THREE.AdditiveBlending, depthTest: false, transparent: true });
+            starMaterial = new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(0xffffff) }, pointTexture: { value: new THREE.TextureLoader().load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/star_particles.png') }, time: { value: 1.0 } }, vertexShader, fragmentShader, blending: THREE.AdditiveBlending, depthTest: false, transparent: true });
             starfield = new THREE.Points(starGeometry, starMaterial);
             scene.add(starfield);
+        }
+
+        // --- NEW: Function to create shooting stars ---
+        function createShootingStars() {
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 20;
+            const positions = [];
+            for (let i = 0; i < starCount; i++) {
+                positions.push(
+                    (Math.random() - 0.5) * 4000,
+                    500 + Math.random() * 1500,
+                    (Math.random() - 0.5) * 4000
+                );
+            }
+            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const starMat = new THREE.PointsMaterial({
+                color: 0x87CEEB, size: 8, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7
+            });
+            shootingStars = new THREE.Points(starGeo, starMat);
+            scene.add(shootingStars);
+        }
+        
+        // --- NEW: Function to create distant galaxies from PNGs ---
+        function createDistantGalaxies() {
+            const galaxyLoader = new THREE.TextureLoader();
+            const galaxyTexture1 = galaxyLoader.load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/galaxy-png-transparent-12.png');
+            const galaxyTexture2 = galaxyLoader.load('https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/galaxy-png-transparent-23.png');
+
+            const geo1 = new THREE.BufferGeometry();
+            geo1.setAttribute('position', new THREE.Float32BufferAttribute([3000, 800, -4000], 3));
+            const mat1 = new THREE.PointsMaterial({ map: galaxyTexture1, size: 400, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.3 });
+            distantGalaxies1 = new THREE.Points(geo1, mat1);
+            scene.add(distantGalaxies1);
+            
+            const geo2 = new THREE.BufferGeometry();
+            geo2.setAttribute('position', new THREE.Float32BufferAttribute([-3500, 1200, -3000], 3));
+            const mat2 = new THREE.PointsMaterial({ map: galaxyTexture2, size: 350, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.3, rotation: Math.PI / 4 });
+            distantGalaxies2 = new THREE.Points(geo2, mat2);
+            scene.add(distantGalaxies2);
         }
 
         function createInteractive3DUI() {
@@ -92,37 +132,28 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const uiWidth = 1024, uiHeight = 256;
             canvas.width = uiWidth; canvas.height = uiHeight;
             const context = canvas.getContext('2d');
-            
             const buttonWidth = 240, buttonHeight = 70, gap = 30;
             const totalBottomWidth = buttonWidth * 2 + gap;
-
-            context.strokeStyle = '#FFFFFF'; 
-            context.fillStyle = '#FFFFFF'; 
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.lineWidth = 4;
-
-            context.font = "italic bold 40px 'JetBrains Mono', monospace"; 
+            context.strokeStyle = '#FFFFFF'; context.fillStyle = '#FFFFFF';
+            context.textAlign = 'center'; context.textBaseline = 'middle'; context.lineWidth = 4;
+            context.font = "italic bold 40px 'JetBrains Mono', monospace";
             const topButtonWidth = totalBottomWidth;
             context.strokeRect((uiWidth - topButtonWidth) / 2, 20, topButtonWidth, buttonHeight);
             context.fillText("Signatures", uiWidth / 2, 20 + buttonHeight / 2);
-
-            context.font = "bold 40px 'JetBrains Mono', monospace"; 
+            context.font = "bold 40px 'JetBrains Mono', monospace";
             context.strokeRect((uiWidth - totalBottomWidth) / 2, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
             context.fillText("To be", (uiWidth - totalBottomWidth) / 2 + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
             context.strokeRect((uiWidth - totalBottomWidth) / 2 + buttonWidth + gap, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
             context.fillText("To do", (uiWidth - totalBottomWidth) / 2 + buttonWidth + gap + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
-
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
             const geometry = new THREE.PlaneGeometry(uiWidth / 20, uiHeight / 20);
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
-            
             const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 20, buttonHeight / 20);
             const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            hiddenButton.position.set(6.4, -6.0, -48); 
+            hiddenButton.position.set(6.4, -6.0, -48);
             scene.add(hiddenButton);
         }
 
@@ -142,24 +173,18 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 20000);
             camera.position.set(0, 2.5, 0);
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
-            // --- MODIFIED: Replaced CubeTextureLoader with a single equirectangular texture on a sphere ---
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', function(texture) {
-                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40); // Large radius, good segments
-                const skySphereMat = new THREE.MeshBasicMaterial({
-                    map: texture,
-                    side: THREE.BackSide // Render on the inside of the sphere
-                });
+                const skySphereGeo = new THREE.SphereGeometry(8000, 60, 40);
+                const skySphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
                 const skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
                 scene.add(skySphere);
             });
-            // --- END MODIFICATION ---
 
             const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
             ocean = new THREE.Water(waterGeometry, {
@@ -172,6 +197,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(ocean);
 
             createStarfield();
+            createShootingStars(); // --- NEW: Call function
+            createDistantGalaxies(); // --- NEW: Call function
             createInteractive3DUI();
 
             raycaster = new THREE.Raycaster();
@@ -187,14 +214,25 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             camera.lookAt(0, 3 + Math.sin(elapsedTime * 0.4) * 0.2, -100);
 
             if (uiPlane) {
-                uiPlane.position.set(camera.position.x, camera.position.y + 2.5, camera.position.z - 50); 
+                uiPlane.position.set(camera.position.x, camera.position.y + 2.5, camera.position.z - 50);
                 uiPlane.rotation.copy(camera.rotation);
             }
-            
-            // --- MODIFIED: Removed rotation of scene.background, as the sky is now a static sphere ---
-            if (starfield) starfield.rotation.y = elapsedTime * 0.02;
 
-            if (starMaterial) starMaterial.uniforms['time'].value += 0.01;
+            // --- NEW: Animation logic for shooting stars ---
+            if (shootingStars) {
+                shootingStars.geometry.attributes.position.array.forEach((_, i) => {
+                    if (i % 3 === 1) { // y-coordinate
+                        shootingStars.geometry.attributes.position.array[i] -= 20; // Speed
+                        if (shootingStars.geometry.attributes.position.array[i] < -1000) {
+                            shootingStars.geometry.attributes.position.array[i] = 1000 + Math.random() * 1000; // Reset
+                        }
+                    }
+                });
+                shootingStars.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (starfield) starfield.rotation.y = elapsedTime * 0.01;
+            if (starMaterial) starMaterial.uniforms['time'].value = elapsedTime;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
             renderer.render(scene, camera);
@@ -209,9 +247,31 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
         const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         const iconUnmuted = document.getElementById('icon-unmuted'), iconMuted = document.getElementById('icon-muted');
-        function unlockAmbientAudio() { if (oceanAudio.paused) { oceanAudio.volume = 0.2; oceanAudio.play().catch(e => console.error("Ocean audio could not be unlocked:", e)); } }
+        
+        // --- MODIFIED: This function now only unmutes the ocean on the first click ---
+        function unlockAmbientAudio() {
+            if (oceanAudio.muted) {
+                oceanAudio.muted = false;
+                oceanAudio.volume = 0.2;
+            }
+        }
         document.body.addEventListener('click', unlockAmbientAudio, { once: true });
-        function toggleMusic(event) { event.stopPropagation(); unlockAmbientAudio(); if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e)); audioControl.classList.add('playing'); iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none'; } else { wayfindersAudio.pause(); audioControl.classList.remove('playing'); iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block'; } }
+        
+        // --- MODIFIED: This function now ONLY toggles the music (sea shanty) ---
+        function toggleMusic(event) {
+            event.stopPropagation();
+            if (wayfindersAudio.paused) {
+                wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e));
+                audioControl.classList.add('playing');
+                iconUnmuted.style.display = 'block';
+                iconMuted.style.display = 'none';
+            } else {
+                wayfindersAudio.pause();
+                audioControl.classList.remove('playing');
+                iconUnmuted.style.display = 'none';
+                iconMuted.style.display = 'block';
+            }
+        }
         audioControl.addEventListener('click', toggleMusic);
     </script>
 </body>
