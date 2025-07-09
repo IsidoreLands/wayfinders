@@ -75,7 +75,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.textBaseline = 'middle';
             const seaweedFont = "70px 'Seaweed Script', cursive";
 
-            // --- RE-CALCULATED all drawing coordinates for accuracy ---
             const btnHeight = 120;
             const btnWidthSignatures = 580;
             const btnWidthBottom = 270;
@@ -85,13 +84,11 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const totalBottomWidth = btnWidthBottom * 2 + gap;
             const bottomStartX = (size - totalBottomWidth) / 2;
 
-            // Draw "Signatures" button
             context.font = "italic " + seaweedFont;
             const sigX = size / 2;
             context.strokeRect(sigX - btnWidthSignatures / 2, topRowY, btnWidthSignatures, btnHeight);
             context.fillText("Signatures", sigX, topRowY + btnHeight / 2);
 
-            // Draw "To be" and "To do" buttons
             context.font = seaweedFont;
             const beX = bottomStartX + btnWidthBottom / 2;
             context.strokeRect(bottomStartX, bottomRowY, btnWidthBottom, btnHeight);
@@ -106,40 +103,35 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const geometry = new THREE.PlaneGeometry(160, 80);
             
             uiPlane = new THREE.Mesh(geometry, material);
-            // --- FIXED: Position the UI plane high above the water so it can be reflected ---
-            uiPlane.position.set(0, 80, -500);
-            scene.add(uiPlane);
+            scene.add(uiPlane); // We will position this in the animate loop
 
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             
-            // Re-calculated clickable areas to match the new drawing
-            const sigGeo = new THREE.PlaneGeometry(88, 19);
+            const sigGeo = new THREE.PlaneGeometry(90, 20);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
             sigBtn.position.set(0, 16, 0.1);
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
-            const beGeo = new THREE.PlaneGeometry(42, 19);
+            const beGeo = new THREE.PlaneGeometry(43, 20);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
             beBtn.position.set(-24, -20, 0.1);
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
-            const doGeo = new THREE.PlaneGeometry(42, 19);
+            const doGeo = new THREE.PlaneGeometry(43, 20);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
             doBtn.position.set(24, -20, 0.1);
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
-            const doRefGeo = new THREE.PlaneGeometry(42, 19);
+            const doRefGeo = new THREE.PlaneGeometry(43, 20);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
-            // The reflection's position is the inverse of the real button's world position
-            doRefBtn.position.set(uiPlane.position.x + 24, -(uiPlane.position.y - 20), uiPlane.position.z);
-            scene.add(doRefBtn);
+            scene.add(doRefBtn); // This will be positioned relative to the uiPlane in the animate loop
             clickableObjects.push(doRefBtn);
         }
 
@@ -220,9 +212,25 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
             camera.lookAt(0, 80, -1000); 
 
+            // --- THE DEFINITIVE FIX: Using rotation.copy() ---
             if (uiPlane) {
-                // Keep the UI plane facing the camera, but at its fixed world position
-                uiPlane.lookAt(camera.position);
+                // This keeps the UI correctly oriented for both the main and reflection cameras
+                uiPlane.position.set(
+                    camera.position.x,
+                    camera.position.y + 20, // Position it vertically in the frame
+                    camera.position.z - 200 // Position it at a fixed distance
+                );
+                uiPlane.rotation.copy(camera.rotation); // The key fix
+
+                // Position the reflection button dynamically
+                const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
+                const todoButton = clickableObjects.find(o => o.name === 'todo');
+                if (reflectionButton && todoButton) {
+                    const worldPos = new THREE.Vector3();
+                    todoButton.getWorldPosition(worldPos); // Get the world position of the real button
+                    reflectionButton.position.set(worldPos.x, -worldPos.y, worldPos.z);
+                    reflectionButton.lookAt(0, -camera.position.y, 0); // Orient it for clicking
+                }
             }
 
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
