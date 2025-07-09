@@ -7,7 +7,6 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
-    <!-- MODIFIED: New font requested by user -->
     <link href="https://fonts.googleapis.com/css2?family=Seaweed+Script&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -29,13 +28,12 @@
         body {
             display: flex; flex-direction: column; position: relative;
         }
-        /* NEW: Canvas is in a container to ensure it stays in the background */
         #canvas-container {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%; z-index: 0;
         }
         #header {
-            position: relative; z-index: 2; /* Header is always on top */
+            position: relative; z-index: 2;
             display: flex; align-items: center; min-height: 80px; padding: 0;
             background-color: var(--background-color);
         }
@@ -45,10 +43,9 @@
         #audio-controls:hover { color: #FFFFFF; }
         #audio-controls.playing { color: var(--accent-color); }
         
-        /* NEW: The main UI is now HTML, floating on top of the 3D canvas */
         #ui-container {
             position: absolute;
-            top: 50%; /* Position UI in the vertical center of the screen */
+            top: 40%; /* MODIFIED: Moved UI higher */
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 1;
@@ -67,19 +64,16 @@
             cursor: pointer;
             transition: background-color 0.2s;
         }
-        .ui-button:hover {
-             background-color: rgba(255, 255, 255, 0.1);
-        }
-        .ui-row {
-            display: flex;
-            gap: 1.5rem;
-        }
+        .ui-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .ui-row { display: flex; gap: 1.5rem; }
         #btn-signatures { font-style: italic; }
 
         @media (max-width: 768px) { 
             #logo { max-width: 40%; max-height: 60px; } 
             #header { min-height: 60px; } 
             :root { --ui-font-size: 1.8rem; }
+            /* NEW: Prevents mobile text wrapping */
+            .ui-button { white-space: nowrap; padding: 0.5rem 1rem; }
         }
     </style>
 </head>
@@ -95,7 +89,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         </button>
     </div>
 
-    <!-- The crisp, visible UI the user interacts with -->
     <div id="ui-container">
         <button class="ui-button" id="btn-signatures">Signatures</button>
         <div class="ui-row">
@@ -104,7 +97,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         </div>
     </div>
 
-    <!-- The 3D scene is rendered inside this container -->
     <div id="canvas-container"></div>
 
     <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
@@ -114,23 +106,17 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
         let galaxyTexture, hiddenButton;
         
-        // --- NEW: A dedicated 3D plane just for creating the reflection ---
         function createReflectionPlane() {
-            // This canvas creates a "ghost" image of the UI to be reflected
             const canvas = document.createElement('canvas');
             const size = 1024;
-            canvas.width = size;
-            canvas.height = size;
+            canvas.width = size; canvas.height = size;
             const context = canvas.getContext('2d');
             
-            // Draw a faint, transparent version of the button outlines
             context.strokeStyle = 'rgba(255, 255, 255, 0.4)';
             context.lineWidth = 8;
             
-            const btnHeight = 140;
-            const btnWidthSignatures = 510;
-            const btnWidthBottom = 240;
-            const gap = 40;
+            const btnHeight = 140; const btnWidthSignatures = 510;
+            const btnWidthBottom = 240; const gap = 40;
             
             context.strokeRect((size - btnWidthSignatures) / 2, 20, btnWidthSignatures, btnHeight);
             context.strokeRect((size - (btnWidthBottom * 2 + gap)) / 2, 20 + btnHeight + gap, btnWidthBottom, btnHeight);
@@ -138,17 +124,17 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
-            const geometry = new THREE.PlaneGeometry(50, 50); // Match size from canvas drawing
+            const geometry = new THREE.PlaneGeometry(80, 80); // Large plane for reflection
             
             const reflectionPlane = new THREE.Mesh(geometry, material);
-            reflectionPlane.position.set(0, 15, -400); // Position just above the water
+            reflectionPlane.position.set(0, -35, -400); // Position it just above the water
+            reflectionPlane.rotation.x = -0.1; // Slight tilt
             scene.add(reflectionPlane);
 
-            // Create the invisible clickable target over the "To Do" reflection area
-            const hiddenGeo = new THREE.PlaneGeometry(15.5, 9);
-            const hiddenMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }); // Make it invisible
+            const hiddenGeo = new THREE.PlaneGeometry(25, 11); // Area of "To Do" reflection
+            const hiddenMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            hiddenButton.position.set(22, 10, -400); // Manually position over the reflection
+            hiddenButton.position.set(22, -43, -400); // Position over the reflection of the button
             scene.add(hiddenButton);
         }
 
@@ -159,15 +145,15 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             camera.position.set(0, 50, 300);
             
             const canvasContainer = document.getElementById('canvas-container');
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setClearColor(0x000000, 0);
             renderer.setSize(window.innerWidth, window.innerHeight);
             canvasContainer.appendChild(renderer.domElement);
 
             const textureLoader = new THREE.TextureLoader();
-
             textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', (t) => { scene.background = t; });
-            
             galaxyTexture = textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
+            
             const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
             const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true });
             const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
@@ -182,18 +168,22 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 waterColor: 0x001e0f, distortionScale: 3.7, fog: true
             });
             ocean.rotation.x = -Math.PI / 2;
-            ocean.position.y = 0; // The horizon is at y=0
+            ocean.position.y = 0;
             scene.add(ocean);
             
             createReflectionPlane();
 
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
-            renderer.domElement.addEventListener('click', onCanvasClick, false);
+            renderer.domElement.addEventListener('mousedown', onCanvasClick, false);
+            
+            // --- NEW: Event listeners for the visible HTML buttons ---
+            document.getElementById('btn-signatures').addEventListener('click', () => alert('Signatures button clicked!'));
+            document.getElementById('btn-tobe').addEventListener('click', () => alert('To be button clicked!'));
+            document.getElementById('btn-todo').addEventListener('click', () => alert('To do button clicked!'));
         }
 
         function onCanvasClick(event) {
-            // Calculate mouse position relative to the canvas
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -213,7 +203,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             // Camera aims high, forcing horizon to bottom third
             camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
-            camera.lookAt(0, 100, -1000); 
+            camera.lookAt(0, 80, -1000); 
 
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
