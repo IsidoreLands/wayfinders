@@ -6,7 +6,7 @@
     <title>Wayfinders | OODA WIKI</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -57,13 +57,10 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
-        // --- MODIFIED: Removed all particle system variables ---
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let skyBackdrop;
+        let galaxyTexture; // The only texture we need to animate
         let uiPlane, hiddenButton;
         
-        // --- REMOVED: All particle system functions are deleted ---
-
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
             const uiWidth = 1024, uiHeight = 256;
@@ -107,23 +104,31 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 20, 0); // Start slightly higher for a better view
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000);
+            camera.position.set(0, 50, 100); // Start higher and further back
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
             const textureLoader = new THREE.TextureLoader();
-            textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
-                // --- REBUILT: A very tall, wide cylinder arc to act as a backdrop ---
-                const backdropGeo = new THREE.CylinderGeometry(14000, 14000, 12000, 60, 1, true, 0, Math.PI * 1.8);
-                const backdropMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide, transparent: true, opacity: 0.95 });
-                skyBackdrop = new THREE.Mesh(backdropGeo, backdropMat);
-                skyBackdrop.position.y = 0; // Center it vertically
-                skyBackdrop.rotation.y = Math.PI; // Rotate to face the camera
-                scene.add(skyBackdrop);
-            });
+
+            // Layer 1: Static, sparse star background
+            const staticSkyTexture = textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg');
+            const staticSkyGeo = new THREE.PlaneGeometry(16000, 9000);
+            const staticSkyMat = new THREE.MeshBasicMaterial({ map: staticSkyTexture });
+            const staticSkyPlane = new THREE.Mesh(staticSkyGeo, staticSkyMat);
+            staticSkyPlane.position.set(0, 0, -5000);
+            scene.add(staticSkyPlane);
+            
+            // Layer 2: Scrolling, vibrant galaxy layer
+            galaxyTexture = textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg');
+            galaxyTexture.wrapS = THREE.RepeatWrapping; // Enable repeating for the scroll effect
+            const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
+            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, opacity: 1.0 });
+            const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
+            galaxyPlane.position.set(0, 200, -4000); // Place it in front of the static sky
+            scene.add(galaxyPlane);
 
             const waterGeometry = new THREE.PlaneGeometry(40000, 40000);
             ocean = new THREE.Water(waterGeometry, {
@@ -146,20 +151,21 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Camera sways gently while looking towards the horizon
-            camera.position.y = 20 + Math.sin(elapsedTime * 0.4) * 2;
-            camera.position.x = Math.sin(elapsedTime * 0.2) * 5;
-            camera.lookAt(0, 25, -100);
+            // Camera sways gently, looking up high to place horizon in bottom third
+            camera.position.y = 50 + Math.sin(elapsedTime * 0.4) * 5;
+            camera.position.x = Math.cos(elapsedTime * 0.2) * 10;
+            camera.lookAt(0, 60, -500);
+
+            if (galaxyTexture) {
+                // This creates the slow, majestic, continuous scroll
+                galaxyTexture.offset.x -= 0.0001;
+            }
 
             if (uiPlane) {
-                uiPlane.position.set(0, 35, -90);
+                uiPlane.position.set(0, 120, -600);
                 uiPlane.lookAt(camera.position);
 
-                hiddenButton.position.set(5.5, 0, -90);
-            }
-            
-            if (skyBackdrop) {
-                skyBackdrop.rotation.y += 0.0001; // Slow, majestic rotation
+                hiddenButton.position.set(13.5, 0, -600); // Repositioned reflection on water plane
             }
 
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
