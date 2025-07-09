@@ -1,3 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wayfinders | OODA WIKI</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
+
+    <style>
+        :root {
+            --background-color: #000000;
+            /* --accent-color is no longer used for the 3D UI, but kept for audio controls */
+            --accent-color: #00FF00;
+            --muted-color: #555555;
+        }
+        html, body {
+            height: 100%; margin: 0;
+            overflow: hidden; background-color: var(--background-color);
+        }
+        body {
+            display: flex; flex-direction: column; position: relative;
+        }
+        #skybox-canvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 0;
+        }
+        #header {
+            display: flex; align-items: center; min-height: 80px; padding: 0;
+            background-color: var(--background-color); position: relative; z-index: 2; /* Header is highest layer */
+        }
+        #logo { max-height: 100%; max-width: 20%; height: auto; margin-left: 20px; overflow: hidden; }
+        #black-strip { flex-grow: 1; height: 100%; background-color: var(--background-color); }
+        #audio-controls { background: none; border: none; padding: 10px; margin-right: 15px; cursor: pointer; color: var(--muted-color); transition: color 0.2s ease-in-out; }
+        #audio-controls:hover { color: #FFFFFF; }
+        #audio-controls.playing { color: var(--accent-color); }
+        @media (max-width: 768px) { #logo { max-width: 40%; max-height: 60px; } #header { min-height: 60px; } }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <img id="logo" src="OODA Wayfinders.png" alt="OODA Wayfinders Logo">
+        <div id="black-strip"></div>
+        <button id="audio-controls" aria-label="Toggle Audio">
+            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg"
+width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15
+11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>
+        </button>
+    </div>
+
+    <audio id="wayfindersAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/sammysmallseashanty.mp3" loop></audio>
+    <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop></audio>
+
     <script>
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
         let uiPlane, hiddenButton; // References to our new 3D UI objects
@@ -11,7 +70,7 @@
             const color = new THREE.Color(), radius = 1000;
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = 50 + Math.random() * radius; // Elevate starfield to prevent clipping
+                const y = 50 + Math.random() * radius; 
                 const z = (Math.random() - 0.5) * 2 * radius;
                 if(Math.sqrt(x*x + (y-50-radius)*(y-50-radius) + z*z) > radius) continue;
                 positions.push(x, y, z);
@@ -37,20 +96,17 @@
             const buttonWidth = 240, buttonHeight = 70, gap = 30;
             const totalBottomWidth = buttonWidth * 2 + gap;
 
-            // --- MODIFIED: Color changed from accent green to white ---
             context.strokeStyle = '#FFFFFF'; 
             context.fillStyle = '#FFFFFF'; 
             context.textAlign = 'center';
             context.textBaseline = 'middle';
             context.lineWidth = 4;
 
-            // --- MODIFIED: Font style changed to italic for this button ---
             context.font = "italic bold 40px 'JetBrains Mono', monospace"; 
             const topButtonWidth = totalBottomWidth;
             context.strokeRect((uiWidth - topButtonWidth) / 2, 20, topButtonWidth, buttonHeight);
             context.fillText("Signatures", uiWidth / 2, 20 + buttonHeight / 2);
 
-            // --- MODIFIED: Font style set back to bold for subsequent buttons ---
             context.font = "bold 40px 'JetBrains Mono', monospace"; 
             context.strokeRect((uiWidth - totalBottomWidth) / 2, 20 + buttonHeight + gap, buttonWidth, buttonHeight);
             context.fillText("To be", (uiWidth - totalBottomWidth) / 2 + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
@@ -66,8 +122,6 @@
             const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 20, buttonHeight / 20);
             const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-
-            // --- MODIFIED: Y position of reflection lowered to match new UI height ---
             hiddenButton.position.set(6.4, -6.0, -48); 
             scene.add(hiddenButton);
         }
@@ -94,9 +148,18 @@
             renderer.domElement.id = 'skybox-canvas';
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
-            const loader = new THREE.CubeTextureLoader();
-            const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
-            scene.background = texture;
+            // --- MODIFIED: Replaced CubeTextureLoader with a single equirectangular texture on a sphere ---
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load('https://www.solarsystemscope.com/textures/download/8k_stars_milky_way.jpg', function(texture) {
+                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40); // Large radius, good segments
+                const skySphereMat = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    side: THREE.BackSide // Render on the inside of the sphere
+                });
+                const skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
+                scene.add(skySphere);
+            });
+            // --- END MODIFICATION ---
 
             const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
             ocean = new THREE.Water(waterGeometry, {
@@ -124,13 +187,13 @@
             camera.lookAt(0, 3 + Math.sin(elapsedTime * 0.4) * 0.2, -100);
 
             if (uiPlane) {
-                // --- MODIFIED: Y position of UI plane raised to move it higher on screen ---
                 uiPlane.position.set(camera.position.x, camera.position.y + 2.5, camera.position.z - 50); 
                 uiPlane.rotation.copy(camera.rotation);
             }
-
+            
+            // --- MODIFIED: Removed rotation of scene.background, as the sky is now a static sphere ---
             if (starfield) starfield.rotation.y = elapsedTime * 0.02;
-            if (scene.background) scene.background.rotation += 0.0001;
+
             if (starMaterial) starMaterial.uniforms['time'].value += 0.01;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
@@ -151,3 +214,5 @@
         function toggleMusic(event) { event.stopPropagation(); unlockAmbientAudio(); if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e)); audioControl.classList.add('playing'); iconUnmuted.style.display = 'block'; iconMuted.style.display = 'none'; } else { wayfindersAudio.pause(); audioControl.classList.remove('playing'); iconUnmuted.style.display = 'none'; iconMuted.style.display = 'block'; } }
         audioControl.addEventListener('click', toggleMusic);
     </script>
+</body>
+</html>
