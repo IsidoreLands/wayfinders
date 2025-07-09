@@ -57,7 +57,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
-        // --- MODIFIED: Added reference for the skySphere mesh ---
         let scene, camera, renderer, starMaterial, ocean, clock, starfield, raycaster, mouse;
         let shootingStars, skySphere;
         let uiPlane, hiddenButton;
@@ -65,18 +64,19 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         const vertexShader = `attribute float size; attribute vec3 customColor; varying vec3 vColor; void main() { vColor = customColor; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_PointSize = size * (300.0 / -mvPosition.z); gl_Position = projectionMatrix * mvPosition; }`;
         const fragmentShader = `uniform vec3 color; uniform sampler2D pointTexture; uniform float time; varying vec3 vColor; void main() { float intensity = sin(time * 2.0 + vColor.r * 100.0); float twinkle = 0.5 + 0.5 * intensity; gl_FragColor = vec4(vColor * color, twinkle); gl_FragColor = gl_FragColor * texture2D(pointTexture, gl_PointCoord); }`;
         
+        // --- MODIFIED: Stars now generate primarily in the upper hemisphere ---
         function createStarfield() {
             const starGeometry = new THREE.BufferGeometry(), starCount = 50000, positions = [], colors = [], sizes = [];
-            const color = new THREE.Color(), radius = 4000; // Increased radius to prevent clipping with wider FOV
+            const color = new THREE.Color(), radius = 4000;
             for (let i = 0; i < starCount; i++) {
                 const x = (Math.random() - 0.5) * 2 * radius;
-                const y = (Math.random() - 0.5) * 2 * radius; // More vertical spread
+                const y = Math.random() * radius; // Ensure y is positive, placing stars above the horizon
                 const z = (Math.random() - 0.5) * 2 * radius;
-                if(Math.sqrt(x*x + y*y + z*z) > radius) continue;
+                if(Math.sqrt(x*x + (y-radius/2)*(y-radius/2) + z*z) > radius) continue;
                 positions.push(x, y, z);
                 color.setHSL(0.6, 0.1, 0.5 + Math.random() * 0.2);
                 colors.push(color.r, color.g, color.b);
-                sizes.push(Math.random() * 3 + 2);
+                sizes.push(Math.random() * 4 + 2);
             }
             starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             starGeometry.setAttribute('customColor', new THREE.Float32BufferAttribute(colors, 3));
@@ -86,6 +86,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             scene.add(starfield);
         }
 
+        // --- MODIFIED: Shooting stars now generate and fall from high in the sky ---
         function createShootingStars() {
             const starGeo = new THREE.BufferGeometry();
             const starCount = 20;
@@ -93,14 +94,12 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             for (let i = 0; i < starCount; i++) {
                 positions.push(
                     (Math.random() - 0.5) * 6000,
-                    1000 + Math.random() * 2500,
+                    2000 + Math.random() * 2000, // Start much higher
                     (Math.random() - 0.5) * 6000
                 );
             }
             starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            const starMat = new THREE.PointsMaterial({
-                color: 0x87CEEB, size: 12, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7
-            });
+            const starMat = new THREE.PointsMaterial({ color: 0x87CEEB, size: 15, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8 });
             shootingStars = new THREE.Points(starGeo, starMat);
             scene.add(shootingStars);
         }
@@ -125,13 +124,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", (uiWidth - totalBottomWidth) / 2 + buttonWidth + gap + buttonWidth / 2, 20 + buttonHeight + gap + buttonHeight / 2);
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-            const geometry = new THREE.PlaneGeometry(uiWidth / 20, uiHeight / 20);
+            const geometry = new THREE.PlaneGeometry(uiWidth / 40, uiHeight / 40); // Made UI physically larger
             uiPlane = new THREE.Mesh(geometry, material);
             scene.add(uiPlane);
-            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 20, buttonHeight / 20);
+
+            const hiddenGeo = new THREE.PlaneGeometry(buttonWidth / 40, buttonHeight / 40);
             const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            hiddenButton.position.set(6.4, -6.0, -48);
             scene.add(hiddenButton);
         }
 
@@ -149,9 +148,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- MODIFIED: Dramatically widened the camera's FOV to 120 for a panoramic view ---
-            camera = new THREE.PerspectiveCamera(120, window.innerWidth / window.innerHeight, 1, 20000);
-            camera.position.set(0, 2.5, 0);
+            // --- REBUILT: New camera perspective to create a horizon view ---
+            camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 1, 20000);
+            camera.position.set(0, 0, 15); // Start slightly behind origin
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.id = 'skybox-canvas';
@@ -159,14 +158,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
             const textureLoader = new THREE.TextureLoader();
             textureLoader.load('https://cdn.eso.org/images/screen/eso0932a.jpg', function(texture) {
-                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40); // Increased radius for safety
+                const skySphereGeo = new THREE.SphereGeometry(10000, 60, 40);
                 const skySphereMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
-                // --- MODIFIED: Assign the created mesh to the global variable ---
                 skySphere = new THREE.Mesh(skySphereGeo, skySphereMat);
                 scene.add(skySphere);
             });
 
-            const waterGeometry = new THREE.PlaneGeometry(10000, 10000);
+            const waterGeometry = new THREE.PlaneGeometry(20000, 20000);
             ocean = new THREE.Water(waterGeometry, {
                 textureWidth: 512, textureHeight: 512,
                 waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', function(texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; }),
@@ -174,6 +172,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 waterColor: 0x001e0f, distortionScale: 3.7,
             });
             ocean.rotation.x = -Math.PI / 2;
+            ocean.position.y = -15; // --- MODIFIED: Lowered ocean to be below the camera's initial view
             scene.add(ocean);
 
             createStarfield();
@@ -189,32 +188,38 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            camera.position.y = 2.5 + Math.sin(elapsedTime * 0.5) * 0.2;
-            camera.lookAt(0, 3 + Math.sin(elapsedTime * 0.4) * 0.2, -100);
+            // --- REBUILT: New camera animation looking out towards a horizon ---
+            camera.position.y = -5 + Math.sin(elapsedTime * 0.5) * 0.5; // Gentle vertical sway
+            camera.position.x = Math.cos(elapsedTime * 0.3) * 0.5; // Gentle horizontal sway
+            camera.lookAt(0, 5, -100); // Look at a fixed point far above the horizon
 
+            // --- REBUILT: New UI positioning logic ---
             if (uiPlane) {
-                uiPlane.position.set(camera.position.x, camera.position.y + 2.5, camera.position.z - 50);
-                uiPlane.rotation.copy(camera.rotation);
+                // Place the UI in a fixed position high in the sky
+                uiPlane.position.set(0, 20, -100);
+                uiPlane.lookAt(camera.position); // Always face the camera
+
+                // Place the reflection button on the water plane, below the "To Do" button
+                hiddenButton.position.set(3.5, -20, -100); // Manually adjusted position
             }
             
             if (shootingStars) {
                 shootingStars.geometry.attributes.position.array.forEach((_, i) => {
                     if (i % 3 === 1) { // y-coordinate
-                        shootingStars.geometry.attributes.position.array[i] -= 25; // Slightly faster
-                        if (shootingStars.geometry.attributes.position.array[i] < -2000) {
-                            shootingStars.geometry.attributes.position.array[i] = 2000 + Math.random() * 2000;
+                        shootingStars.geometry.attributes.position.array[i] -= 35;
+                        if (shootingStars.geometry.attributes.position.array[i] < -1000) {
+                            shootingStars.geometry.attributes.position.array[i] = 3000 + Math.random() * 2000;
                         }
                     }
                 });
                 shootingStars.geometry.attributes.position.needsUpdate = true;
             }
 
-            // --- NEW: Added slow rotation to the celestial sphere ---
             if (skySphere) {
                 skySphere.rotation.y -= 0.0003;
             }
 
-            if (starfield) starfield.rotation.y = elapsedTime * 0.01;
+            if (starfield) starfield.rotation.y = elapsedTime * 0.005; // Slower rotation
             if (starMaterial) starMaterial.uniforms['time'].value = elapsedTime;
             if (ocean) ocean.material.uniforms['time'].value += 1.0 / 60.0;
 
