@@ -45,14 +45,14 @@
         
         #ui-container {
             position: absolute;
-            top: 40%; /* MODIFIED: Moved UI higher */
+            top: 40%; /* MODIFIED: Moved UI block higher */
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1.5rem;
+            gap: 3.0rem; /* MODIFIED: Doubled the gap between rows */
         }
         .ui-button {
             border: 2px solid var(--ui-color);
@@ -103,6 +103,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
     <audio id="oceanAudio" src="https://raw.githubusercontent.com/IsidoreLands/wayfinders/main/oceanwaves.mp3" loop muted></audio>
 
     <script>
+        // --- NO CHANGES to this script block from the last stable version ---
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
         let galaxyTexture, hiddenButton;
         
@@ -124,17 +125,17 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
-            const geometry = new THREE.PlaneGeometry(80, 80); // Large plane for reflection
+            const geometry = new THREE.PlaneGeometry(80, 80);
             
             const reflectionPlane = new THREE.Mesh(geometry, material);
-            reflectionPlane.position.set(0, -35, -400); // Position it just above the water
-            reflectionPlane.rotation.x = -0.1; // Slight tilt
+            reflectionPlane.position.set(0, -35, -400);
+            reflectionPlane.rotation.x = -0.1;
             scene.add(reflectionPlane);
 
-            const hiddenGeo = new THREE.PlaneGeometry(25, 11); // Area of "To Do" reflection
+            const hiddenGeo = new THREE.PlaneGeometry(25, 11);
             const hiddenMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
             hiddenButton = new THREE.Mesh(hiddenGeo, hiddenMat);
-            hiddenButton.position.set(22, -43, -400); // Position over the reflection of the button
+            hiddenButton.position.set(22, -43, -400);
             scene.add(hiddenButton);
         }
 
@@ -177,7 +178,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             mouse = new THREE.Vector2();
             renderer.domElement.addEventListener('mousedown', onCanvasClick, false);
             
-            // --- NEW: Event listeners for the visible HTML buttons ---
             document.getElementById('btn-signatures').addEventListener('click', () => alert('Signatures button clicked!'));
             document.getElementById('btn-tobe').addEventListener('click', () => alert('To be button clicked!'));
             document.getElementById('btn-todo').addEventListener('click', () => alert('To do button clicked!'));
@@ -200,7 +200,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // Camera aims high, forcing horizon to bottom third
             camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 3;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 5;
             camera.lookAt(0, 80, -1000); 
