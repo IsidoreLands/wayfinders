@@ -19,7 +19,7 @@
             height: 100%;
             margin: 0;
             overflow: hidden;
-            background-color: transparent; /* Allow canvas to show through */
+            background-color: transparent;
         }
         body {
             display: flex;
@@ -32,18 +32,18 @@
             padding: 0;
             background-color: var(--background-color);
             position: relative;
-            z-index: 2; /* Above canvas */
+            z-index: 2;
         }
         #logo {
             max-height: 100%;
-            max-width: 20%; /* Constrain width */
+            max-width: 20%;
             height: auto;
             margin-left: 20px;
-            overflow: hidden; /* Prevent overflow */
+            overflow: hidden;
         }
         @media (max-width: 768px) {
             #logo {
-                max-width: 40%; /* Adjust for mobile */
+                max-width: 40%;
                 max-height: 60px;
             }
             #header {
@@ -79,8 +79,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1; /* Below header */
-            overflow: hidden;
+            z-index: 1;
         }
     </style>
 </head>
@@ -101,16 +100,22 @@
         // Create scene, camera, renderer
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(3.36, 2.80, 21.02);
+        camera.position.set(0, 10, 20); // Adjusted for better view
+        camera.lookAt(0, 0, 0);
         
         const container = document.getElementById('canvas-container');
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(container.clientWidth, container.clientHeight);
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
         container.appendChild(renderer.domElement);
         
         // Add ambient light
-        const ambientLight = new THREE.AmbientLight(0x222222);
+        const ambientLight = new THREE.AmbientLight(0x606060); // Brighter ambient
         scene.add(ambientLight);
+        
+        // Add directional light
+        const directionalLight = new THREE.DirectionalLight(0x606060, 1.0); // Stronger light
+        directionalLight.position.set(0, 1, 0);
+        scene.add(directionalLight);
         
         // Load waternormals texture
         const textureLoader = new THREE.TextureLoader();
@@ -185,14 +190,14 @@
             requestAnimationFrame(animate);
             water.material.uniforms['time'].value += 0.005;
             renderer.render(scene, camera);
+            controls.update();
         }
         animate();
         
         // Handle window resize
         window.addEventListener('resize', () => {
-            const container = document.getElementById('canvas-container');
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            camera.aspect = container.clientWidth / container.clientHeight;
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
         });
         
@@ -203,25 +208,43 @@
         
         function initialPlay() {
             if (!hasInteracted) {
+                console.log('Initial play attempted');
                 hasInteracted = true;
-                audio.play().then(() => { audioToggle.classList.add('playing'); })
-                    .catch(error => { console.log('Autoplay prevented by browser.'); });
+                if (audio) {
+                    audio.play().then(() => {
+                        console.log('Audio playing');
+                        audioToggle.classList.add('playing');
+                    }).catch(error => {
+                        console.error('Audio playback error:', error);
+                    });
+                } else {
+                    console.error('Audio element not found');
+                }
             }
         }
         
         function toggleAudio() {
             if (!hasInteracted) { initialPlay(); return; }
-            if (audio.paused) {
-                audio.play();
-                audioToggle.classList.add('playing');
+            if (audio) {
+                if (audio.paused) {
+                    console.log('Toggling audio on');
+                    audio.play().then(() => {
+                        audioToggle.classList.add('playing');
+                    }).catch(error => {
+                        console.error('Toggle play error:', error);
+                    });
+                } else {
+                    console.log('Toggling audio off');
+                    audio.pause();
+                    audioToggle.classList.remove('playing');
+                }
             } else {
-                audio.pause();
-                audioToggle.classList.remove('playing');
+                console.error('Audio element not found');
             }
         }
         
-        container.addEventListener('click', initialPlay, { once: true });
-        audioToggle.addEventListener('click', toggleAudio);
+        audioToggle.addEventListener('click', toggleAudio); // Primary toggle event
+        container.addEventListener('click', initialPlay, { once: true }); // Initial play on canvas click
     </script>
 </body>
 </html>
