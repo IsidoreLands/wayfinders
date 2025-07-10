@@ -6,7 +6,7 @@
     <title>Wayfinders | OODA WIKI</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Seaweed+Script&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -61,7 +61,7 @@
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let uiPlane, galaxyTexture;
+        let uiPlane;
         const clickableObjects = [];
 
         function createInteractive3DUI() {
@@ -102,7 +102,7 @@
             addClickable("signatures", size / 2, topRowY + btnHeight / 2, btnWidthSignatures, btnHeight);
             addClickable("tobe", bottomStartX + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
             addClickable("todo", bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
-            
+
             const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
@@ -122,19 +122,20 @@
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
             renderer.domElement.id = 'skybox-canvas';
 
-            // Set the base skybox (the purple nebula)
-            const cubeLoader = new THREE.CubeTextureLoader();
-            const skyboxTexture = cubeLoader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
-            scene.background = skyboxTexture;
-            
-            // Layer the beautiful galaxy plane on top of the skybox
             const textureLoader = new THREE.TextureLoader();
-            galaxyTexture = textureLoader.load('eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
-            const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
-            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, blending: THREE.AdditiveBlending });
-            const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
-            galaxyPlane.position.set(0, 700, -5000);
-            scene.add(galaxyPlane);
+
+            // --- CORRECTED BACKGROUND ---
+            // Load the desired texture and apply it as a 360-degree background
+            textureLoader.load('eso0932a.jpg', function(texture) {
+                // This tells Three.js to map the 2D image as a sphere.
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                
+                // Set it as the scene's background and environment.
+                scene.background = texture;
+                scene.environment = texture; // This will provide reflections for materials that support it (like the water).
+            });
+
+            // --- The hallucinated skybox and redundant galaxy plane have been removed ---
 
             const waterGeometry = new THREE.PlaneGeometry(50000, 50000);
             ocean = new THREE.Water(waterGeometry, {
@@ -166,8 +167,7 @@
                     case 'signatures': window.open('https://ooda.wiki/wiki/Signatures', '_blank'); break;
                     case 'tobe': window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank'); break;
                     case 'todo': window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge"; break;
-                    case 'todo_reflection': 
-                        // The hidden action is now empty, as requested.
+                    case 'todo_reflection':
                         console.log("Secret action triggered... but does nothing.");
                         break;
                 }
@@ -193,13 +193,14 @@
                     reflectionButton.rotation.copy(camera.rotation);
                 }
             }
-            
+
             if (uiPlane) {
                 camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
-            
+
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
-            if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
+            
+            // --- Removed animation for the non-existent galaxyTexture ---
             
             renderer.render(scene, camera);
         }
@@ -220,7 +221,7 @@
         }, { once: true });
         audioControl.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e)); audioControl.classList.add('playing'); } 
+            if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e)); audioControl.classList.add('playing'); }
             else { wayfindersAudio.pause(); audioControl.classList.remove('playing'); }
         });
     </script>
