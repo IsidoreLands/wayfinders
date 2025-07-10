@@ -109,21 +109,17 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 map: texture, 
                 transparent: true, 
                 alphaTest: 0.5,
-                depthWrite: false,
                 side: THREE.DoubleSide
             });
             const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
-            uiPlane.renderOrder = 1; // --- FIX: Force UI to be rendered after other objects
             scene.add(uiPlane);
 
-            // --- FIX: Precisely calculate all clickable areas ---
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide });
-            const planeW = 120; const planeH = 60; // The 3D plane's dimensions
-            const canW = 1024; const canH = 512;    // The 2D canvas's dimensions
+            const planeW = 120; const planeH = 60;
+            const canW = 1024; const canH = 512;
 
-            // --- Signatures Button ---
             const sigGeo = new THREE.PlaneGeometry(btnWidthSignatures / canW * planeW, btnHeight / canH * planeH);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
@@ -132,7 +128,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
-            // --- "To be" Button ---
             const beGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
@@ -146,7 +141,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
-            // --- "To do" Button ---
             const doGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
@@ -159,7 +153,6 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
-            // --- Reflection Button (remains dynamically positioned) ---
             const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
@@ -275,8 +268,13 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
-        window.addEventListener('resize', onWindowResize, false);
-        init(); animate();
+        
+        // --- THE DEFINITIVE FIX: Wrap initialization in a font-ready promise ---
+        document.fonts.ready.then(function () {
+            init();
+            animate();
+            window.addEventListener('resize', onWindowResize, false);
+        });
 
         const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         document.body.addEventListener('click', () => {
