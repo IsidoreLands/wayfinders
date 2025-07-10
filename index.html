@@ -61,19 +61,20 @@
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let uiPlane, firePlane;
+        let uiPlane, fireMaterial;
         let isFireCreated = false;
         const clickableObjects = [];
+        const firePlanes = []; // --- NEW: Array to hold all fire planes
 
-        // --- NEW: Function to create the fire effect ---
+        // --- NEW: createFire function completely rewritten ---
         function createFire() {
             const textureLoader = new THREE.TextureLoader();
             const flameTexture1 = textureLoader.load('flame-png-transparent-3.png');
             const flameTexture2 = textureLoader.load('flame-png-transparent-4.png');
             
-            // Make the textures repeat over the large surface
+            // This prevents the texture from repeating on the small planes
             [flameTexture1, flameTexture2].forEach(t => {
-                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
             });
 
             const fireVertexShader = `
@@ -91,32 +92,28 @@
                 varying vec2 vUv;
 
                 void main() {
-                    // Create two different UV coordinates that move and distort over time
-                    vec2 uv1 = vUv + vec2(time * 0.01, sin(vUv.y * 5.0 + time * 0.5) * 0.05);
-                    vec2 uv2 = vUv + vec2(sin(vUv.x * 3.0 - time * 0.6) * 0.05, time * 0.015);
+                    // Animate UVs slightly for a watery distortion effect
+                    vec2 uv1 = vUv + vec2(0.0, sin(vUv.y * 2.0 + time * 0.5) * 0.05);
+                    vec2 uv2 = vUv + vec2(sin(vUv.x * 2.0 - time * 0.6) * 0.05, 0.0);
                     
-                    // Sample the two flame textures with the distorted UVs
-                    vec4 tex1 = texture2D(flameTexture1, uv1 * 5.0); // Tiling factor
-                    vec4 tex2 = texture2D(flameTexture2, uv2 * 5.0); // Tiling factor
+                    vec4 tex1 = texture2D(flameTexture1, uv1);
+                    vec4 tex2 = texture2D(flameTexture2, uv2);
 
-                    // Blend the two textures together using a time-based factor
                     float blendFactor = (sin(time * 1.5) + 1.0) / 2.0;
                     vec4 finalColor = mix(tex1, tex2, blendFactor);
 
-                    // Add a flicker effect to the alpha
-                    float flicker = sin(time * 10.0) * 0.1 + 0.9;
+                    float flicker = sin(time * 10.0 + vUv.y * 10.0) * 0.1 + 0.9;
                     finalColor.a *= flicker;
-
-                    // Ensure alpha is not zero if color is present, to avoid transparent black
-                    if (finalColor.r + finalColor.g + finalColor.b > 0.1) {
-                         finalColor.a = max(finalColor.a, 0.5);
-                    }
+                    
+                    // Don't render the bottom edge of the texture to make it look like it's rising from the water
+                    finalColor.a *= smoothstep(0.0, 0.25, vUv.y);
 
                     gl_FragColor = finalColor;
                 }
             `;
-
-            const fireMaterial = new THREE.ShaderMaterial({
+            
+            // Create ONE material to be shared by all flames
+            fireMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     time: { value: 0.0 },
                     flameTexture1: { value: flameTexture1 },
@@ -129,11 +126,30 @@
                 blending: THREE.AdditiveBlending
             });
 
-            const fireGeometry = new THREE.PlaneGeometry(50000, 50000);
-            firePlane = new THREE.Mesh(fireGeometry, fireMaterial);
-            firePlane.rotation.x = -Math.PI / 2;
-            firePlane.position.y = 0.1; // Just above the water to prevent z-fighting
-            scene.add(firePlane);
+            // Create ONE geometry to be shared by all flames
+            const fireGeometry = new THREE.PlaneGeometry(50, 50);
+
+            // Create a field of 300 flames
+            for (let i = 0; i < 300; i++) {
+                const firePlane = new THREE.Mesh(fireGeometry, fireMaterial);
+
+                // Scatter them randomly in a large circle
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 500 + Math.random() * 4000;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const y = 25; // Half the plane height, so it sits on the water
+                
+                firePlane.position.set(x, y, z);
+                firePlane.rotation.y = Math.random() * Math.PI * 2; // Face random directions
+                
+                // Store a random value for unique animation offset
+                firePlane.userData.randomOffset = Math.random() * 10;
+                
+                firePlanes.push(firePlane);
+                scene.add(firePlane);
+            }
+
             isFireCreated = true;
         }
 
@@ -290,9 +306,17 @@
             
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
             
-            // --- NEW: Animate the fire shader if it exists ---
-            if (firePlane) {
-                firePlane.material.uniforms.time.value = elapsedTime;
+            // --- NEW: Animate the fire shader and individual planes ---
+            if (isFireCreated) {
+                // Update the time uniform for the shared material
+                fireMaterial.uniforms.time.value = elapsedTime;
+                
+                // Animate each flame individually
+                firePlanes.forEach(plane => {
+                    plane.position.y = 25 + Math.sin(elapsedTime * 2.0 + plane.userData.randomOffset) * 5;
+                    // Make flames always face the camera (billboarding)
+                    plane.lookAt(camera.position);
+                });
             }
 
             renderer.render(scene, camera);
