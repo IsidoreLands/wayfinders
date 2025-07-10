@@ -51,10 +51,9 @@
         <img id="logo" src="OODA Wayfinders.png" alt="OODA Wayfinders Logo">
         <div id="black-strip"></div>
         <button id="audio-controls" aria-label="Toggle Audio">
-            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg"
-width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15
-11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>
+            <svg id="icon-unmuted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            <!-- FIX #1: Removed the newline from the points attribute -->
+            <svg id="icon-muted" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>
         </button>
     </div>
 
@@ -63,7 +62,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let uiPlane;
+        let galaxyTexture, uiPlane;
         const clickableObjects = [];
 
         function createInteractive3DUI() {
@@ -173,16 +172,27 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
             renderer.domElement.id = 'skybox-canvas';
 
-            // --- THE FIX: Use a CubeTextureLoader with a known-good, CORS-enabled asset ---
-            const loader = new THREE.CubeTextureLoader();
-            const texture = loader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load([
+            // --- FIX #2: Restore the working purple nebula as a base background ---
+            const cubeLoader = new THREE.CubeTextureLoader();
+            const skyboxTexture = cubeLoader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load([
                 'purplenebula_ft.png', 'purplenebula_bk.png',
                 'purplenebula_up.png', 'purplenebula_dn.png',
                 'purplenebula_rt.png', 'purplenebula_lf.png'
             ]);
-            scene.background = texture;
-            // The old galaxy plane is no longer needed as the skybox provides the background
+            scene.background = skyboxTexture;
             
+            // --- FIX #2: Restore the beautiful galaxy plane, loading the image LOCALLY ---
+            const textureLoader = new THREE.TextureLoader();
+            galaxyTexture = textureLoader.load(
+                'eso0932a.jpg', // This now loads the file from your server
+                (t) => { t.wrapS = THREE.RepeatWrapping; }
+            );
+            const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
+            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true });
+            const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
+            galaxyPlane.position.set(0, 700, -5000);
+            scene.add(galaxyPlane);
+
             const waterGeometry = new THREE.PlaneGeometry(50000, 50000);
             ocean = new THREE.Water(waterGeometry, {
                 textureWidth: 512, textureHeight: 512,
@@ -258,8 +268,8 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                 camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
             
-            // We can add a slow rotation to the skybox for a dynamic effect
-            if (scene.background) {
+            if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
+            if (scene.background.rotation) { // Check if rotation exists before trying to increment
                 scene.background.rotation += 0.0001;
             }
 
