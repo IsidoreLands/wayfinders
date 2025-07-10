@@ -105,11 +105,9 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             context.fillText("To do", doX, bottomRowY + btnHeight / 2);
 
             const texture = new THREE.CanvasTexture(canvas);
-            // --- FIX #2: Implement consultant's final material settings ---
             const material = new THREE.MeshBasicMaterial({ 
                 map: texture, 
                 transparent: true, 
-                opacity: 0.95,
                 alphaTest: 0.5,
                 depthWrite: false,
                 side: THREE.DoubleSide
@@ -117,35 +115,51 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             const geometry = new THREE.PlaneGeometry(120, 60);
             
             uiPlane = new THREE.Mesh(geometry, material);
+            uiPlane.renderOrder = 1; // --- FIX: Force UI to be rendered after other objects
             scene.add(uiPlane);
 
+            // --- FIX: Precisely calculate all clickable areas ---
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide });
-            
-            // --- FIX #1: Re-calculate all clickable areas to precisely match the canvas drawing ---
-            const planeW = 120; const planeH = 60;
-            const canW = 1024; const canH = 512;
+            const planeW = 120; const planeH = 60; // The 3D plane's dimensions
+            const canW = 1024; const canH = 512;    // The 2D canvas's dimensions
 
+            // --- Signatures Button ---
             const sigGeo = new THREE.PlaneGeometry(btnWidthSignatures / canW * planeW, btnHeight / canH * planeH);
             const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
             sigBtn.name = "signatures";
-            sigBtn.position.set(0, 12.5, 0.1); // Y position relative to uiPlane center
+            const sigCenterY_canvas = topRowY + (btnHeight / 2);
+            sigBtn.position.set(0, (canH/2 - sigCenterY_canvas) / canH * planeH, 0.1);
             uiPlane.add(sigBtn);
             clickableObjects.push(sigBtn);
 
+            // --- "To be" Button ---
             const beGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const beBtn = new THREE.Mesh(beGeo, invisibleMat);
             beBtn.name = "tobe";
-            beBtn.position.set(-((btnWidthBottom / 2 + gap / 2) / canW * planeW), -14, 0.1);
+            const beCenterX_canvas = bottomStartX + (btnWidthBottom / 2);
+            const bottomCenterY_canvas = bottomRowY + (btnHeight / 2);
+            beBtn.position.set(
+                (beCenterX_canvas - canW/2) / canW * planeW,
+                (canH/2 - bottomCenterY_canvas) / canH * planeH,
+                0.1
+            );
             uiPlane.add(beBtn);
             clickableObjects.push(beBtn);
 
+            // --- "To do" Button ---
             const doGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doBtn = new THREE.Mesh(doGeo, invisibleMat);
             doBtn.name = "todo";
-            doBtn.position.set(((btnWidthBottom / 2 + gap / 2) / canW * planeW), -14, 0.1);
+            const doCenterX_canvas = bottomStartX + btnWidthBottom + gap + (btnWidthBottom / 2);
+            doBtn.position.set(
+                (doCenterX_canvas - canW/2) / canW * planeW,
+                (canH/2 - bottomCenterY_canvas) / canH * planeH,
+                0.1
+            );
             uiPlane.add(doBtn);
             clickableObjects.push(doBtn);
 
+            // --- Reflection Button (remains dynamically positioned) ---
             const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
