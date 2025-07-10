@@ -68,8 +68,7 @@ width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
-            const size = 1024; canvas.width = size; canvas.height =
-size / 2;
+            const size = 1024; canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
             context.fillStyle = '#000000'; context.fillRect(0, 0, canvas.width, canvas.height);
             context.strokeStyle = '#FFFFFF'; context.fillStyle = '#FFFFFF';
@@ -83,12 +82,9 @@ size / 2;
             context.fillText("Signatures", size / 2, topRowY + btnHeight / 2);
             context.font = seaweedFont;
             context.strokeRect(bottomStartX, bottomRowY, btnWidthBottom, btnHeight);
-            context.fillText("To be", bottomStartX + btnWidthBottom
-/ 2, bottomRowY + btnHeight / 2);
-            context.strokeRect(bottomStartX + btnWidthBottom + gap,
-bottomRowY, btnWidthBottom, btnHeight);
-            context.fillText("To do", bottomStartX + btnWidthBottom
-+ gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2);
+            context.fillText("To be", bottomStartX + btnWidthBottom / 2, bottomRowY + btnHeight / 2);
+            context.strokeRect(bottomStartX + btnWidthBottom + gap, bottomRowY, btnWidthBottom, btnHeight);
+            context.fillText("To do", bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2);
 
             const texture = new THREE.CanvasTexture(canvas);
             const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -106,16 +102,15 @@ bottomRowY, btnWidthBottom, btnHeight);
                 clickableObjects.push(btn);
             };
             addClickable("signatures", size / 2, topRowY + btnHeight / 2, btnWidthSignatures, btnHeight);
-            addClickable("tobe", bottomStartX + btnWidthBottom / 2,
-bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
+            addClickable("tobe", bottomStartX + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
             addClickable("todo", bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
-
-            const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom
-/ canW * planeW, btnHeight / canH * planeH);
-            const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
-            doRefBtn.name = "todo_reflection";
-            scene.add(doRefBtn);
-            clickableObjects.push(doRefBtn);
+            
+            // --- CHANGE 1: Resize reflection geometry to match the 'Signatures' button and rename it ---
+            const sigRefGeo = new THREE.PlaneGeometry(btnWidthSignatures / canW * planeW, btnHeight / canH * planeH);
+            const sigRefBtn = new THREE.Mesh(sigRefGeo, invisibleMat);
+            sigRefBtn.name = "signatures_reflection"; // Renamed from "todo_reflection"
+            scene.add(sigRefBtn);
+            clickableObjects.push(sigRefBtn);
         }
 
         function init() {
@@ -125,25 +120,11 @@ bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
             camera.position.set(0, 5, 100);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setClearColor(0x000000, 0); // This makes the background transparent, showing the black HTML body
+            renderer.setClearColor(0x000000, 0);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
             renderer.domElement.id = 'skybox-canvas';
 
-            // --- HALLUCINATED CODE REMOVED ---
-            // The following block that tried to load 'purplenebula' from a fake URL has been deleted.
-            // The scene background will now correctly fall back to the renderer's clear color (transparent),
-            // which allows the black HTML body to act as the base sky color, as intended.
-            /*
-            const cubeLoader = new THREE.CubeTextureLoader();
-            const skyboxTexture = cubeLoader.setPath('...').load([...]);
-            scene.background = skyboxTexture;
-            */
-            // --- END REMOVED BLOCK ---
-
-
-            // --- ESSENTIAL CODE PRESERVED ---
-            // This is the functional, load-bearing component that creates your desired visual. It is untouched.
             const textureLoader = new THREE.TextureLoader();
             galaxyTexture = textureLoader.load('eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
             const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
@@ -174,8 +155,7 @@ THREE.RepeatWrapping; }),
         function onCanvasClick(event) {
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) *
-2 + 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(clickableObjects, true);
             if (intersects.length > 0) {
@@ -184,7 +164,8 @@ THREE.RepeatWrapping; }),
                     case 'signatures': window.open('https://ooda.wiki/wiki/Signatures', '_blank'); break;
                     case 'tobe': window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank'); break;
                     case 'todo': window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge"; break;
-                    case 'todo_reflection':
+                    // --- CHANGE 2: Update the case to match the new reflection name ---
+                    case 'signatures_reflection':
                         console.log("Secret action triggered... but does nothing.");
                         break;
                 }
@@ -201,11 +182,13 @@ THREE.RepeatWrapping; }),
             if (uiPlane) {
                 uiPlane.position.set(camera.position.x, camera.position.y + 8, camera.position.z - 150);
                 uiPlane.rotation.copy(camera.rotation);
-                const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
-                const todoButton = clickableObjects.find(o => o.name === 'todo');
-                if (reflectionButton && todoButton) {
+
+                // --- CHANGE 3: Update positioning logic to track the 'signatures' button ---
+                const reflectionButton = clickableObjects.find(o => o.name === 'signatures_reflection');
+                const signaturesButton = clickableObjects.find(o => o.name === 'signatures');
+                if (reflectionButton && signaturesButton) {
                     const worldPos = new THREE.Vector3();
-                    todoButton.getWorldPosition(worldPos);
+                    signaturesButton.getWorldPosition(worldPos);
                     reflectionButton.position.set(worldPos.x, -worldPos.y, worldPos.z);
                     reflectionButton.rotation.copy(camera.rotation);
                 }
@@ -216,7 +199,6 @@ THREE.RepeatWrapping; }),
             }
 
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
-            // The animation for your galaxy plane is essential and has been preserved.
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
 
             renderer.render(scene, camera);
