@@ -122,10 +122,12 @@
             document.body.insertBefore(renderer.domElement, document.body.firstChild);
             renderer.domElement.id = 'skybox-canvas';
 
+            // Set the base skybox (the purple nebula)
             const cubeLoader = new THREE.CubeTextureLoader();
             const skyboxTexture = cubeLoader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
             scene.background = skyboxTexture;
             
+            // Layer the beautiful galaxy plane on top of the skybox
             const textureLoader = new THREE.TextureLoader();
             galaxyTexture = textureLoader.load('eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
             const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
@@ -165,6 +167,7 @@
                     case 'tobe': window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank'); break;
                     case 'todo': window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge"; break;
                     case 'todo_reflection': 
+                        // The hidden action is now empty, as requested.
                         console.log("Secret action triggered... but does nothing.");
                         break;
                 }
