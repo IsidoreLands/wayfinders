@@ -61,27 +61,26 @@
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let uiPlane, fireMaterial;
+        let uiPlane, galaxyTexture, fireMaterial, fireInstanceMesh;
         let isFireCreated = false;
         const clickableObjects = [];
-        const firePlanes = []; // --- NEW: Array to hold all fire planes
+        const fireInstanceData = []; // Array to hold unique data for each flame instance
 
-        // --- NEW: createFire function completely rewritten ---
+        // --- NEW: Professional InstancedMesh implementation for the fire effect ---
         function createFire() {
+            const NUM_FLAMES = 500;
+            const FLAME_SIZE = 80;
+            const SPREAD_RADIUS = 5000;
+
             const textureLoader = new THREE.TextureLoader();
             const flameTexture1 = textureLoader.load('flame-png-transparent-3.png');
             const flameTexture2 = textureLoader.load('flame-png-transparent-4.png');
-            
-            // This prevents the texture from repeating on the small planes
-            [flameTexture1, flameTexture2].forEach(t => {
-                t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-            });
 
             const fireVertexShader = `
                 varying vec2 vUv;
                 void main() {
                     vUv = uv;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
                 }
             `;
 
@@ -92,27 +91,26 @@
                 varying vec2 vUv;
 
                 void main() {
-                    // Animate UVs slightly for a watery distortion effect
-                    vec2 uv1 = vUv + vec2(0.0, sin(vUv.y * 2.0 + time * 0.5) * 0.05);
-                    vec2 uv2 = vUv + vec2(sin(vUv.x * 2.0 - time * 0.6) * 0.05, 0.0);
+                    vec2 uv1 = vUv;
+                    vec2 uv2 = vUv;
                     
                     vec4 tex1 = texture2D(flameTexture1, uv1);
                     vec4 tex2 = texture2D(flameTexture2, uv2);
 
-                    float blendFactor = (sin(time * 1.5) + 1.0) / 2.0;
+                    float blendFactor = (sin(time * 1.5 + vUv.y * 5.0) + 1.0) / 2.0;
                     vec4 finalColor = mix(tex1, tex2, blendFactor);
 
-                    float flicker = sin(time * 10.0 + vUv.y * 10.0) * 0.1 + 0.9;
+                    float flicker = sin(time * 10.0 + vUv.y * 10.0) * 0.15 + 0.85;
                     finalColor.a *= flicker;
                     
-                    // Don't render the bottom edge of the texture to make it look like it's rising from the water
-                    finalColor.a *= smoothstep(0.0, 0.25, vUv.y);
+                    finalColor.a *= smoothstep(0.0, 0.15, vUv.y); // Fade in from the bottom
+
+                    if (finalColor.a < 0.1) discard; // Hard cutoff for transparent pixels
 
                     gl_FragColor = finalColor;
                 }
             `;
-            
-            // Create ONE material to be shared by all flames
+
             fireMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     time: { value: 0.0 },
@@ -123,60 +121,48 @@
                 fragmentShader: fireFragmentShader,
                 transparent: true,
                 depthWrite: false,
-                blending: THREE.AdditiveBlending
+                blending: THREE.NormalBlending, // Normal blending works best with alpha clipping (discard)
+                side: THREE.DoubleSide
             });
 
-            // Create ONE geometry to be shared by all flames
-            const fireGeometry = new THREE.PlaneGeometry(50, 50);
-
-            // Create a field of 300 flames
-            for (let i = 0; i < 300; i++) {
-                const firePlane = new THREE.Mesh(fireGeometry, fireMaterial);
-
-                // Scatter them randomly in a large circle
+            const fireGeometry = new THREE.PlaneGeometry(FLAME_SIZE, FLAME_SIZE);
+            fireInstanceMesh = new THREE.InstancedMesh(fireGeometry, fireMaterial, NUM_FLAMES);
+            
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < NUM_FLAMES; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const radius = 500 + Math.random() * 4000;
+                const radius = Math.random() * SPREAD_RADIUS;
                 const x = Math.cos(angle) * radius;
                 const z = Math.sin(angle) * radius;
-                const y = 25; // Half the plane height, so it sits on the water
                 
-                firePlane.position.set(x, y, z);
-                firePlane.rotation.y = Math.random() * Math.PI * 2; // Face random directions
+                dummy.position.set(x, 0, z); // Start at water level
+                dummy.updateMatrix();
+                fireInstanceMesh.setMatrixAt(i, dummy.matrix);
                 
-                // Store a random value for unique animation offset
-                firePlane.userData.randomOffset = Math.random() * 10;
-                
-                firePlanes.push(firePlane);
-                scene.add(firePlane);
+                // Store unique data for animation
+                fireInstanceData.push({
+                    baseY: FLAME_SIZE / 2, // Start with base on the water
+                    randomOffset: Math.random() * 10.0
+                });
             }
-
+            scene.add(fireInstanceMesh);
             isFireCreated = true;
         }
 
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
-            const size = 1024;
-            canvas.width = size; canvas.height = size / 2;
+            const size = 1024; canvas.width = size; canvas.height = size / 2;
             const context = canvas.getContext('2d');
-
-            context.fillStyle = '#000000';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-
-            context.strokeStyle = '#FFFFFF';
-            context.fillStyle = '#FFFFFF';
-            context.lineWidth = 6;
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
+            context.fillStyle = '#000000'; context.fillRect(0, 0, canvas.width, canvas.height);
+            context.strokeStyle = '#FFFFFF'; context.fillStyle = '#FFFFFF';
+            context.lineWidth = 6; context.textAlign = 'center'; context.textBaseline = 'middle';
             const seaweedFont = "70px 'Seaweed Script', cursive";
-
             const btnHeight = 120, btnWidthSignatures = 580, btnWidthBottom = 270, gap = 40;
             const topRowY = 50, bottomRowY = topRowY + btnHeight + gap;
             const bottomStartX = (size - (btnWidthBottom * 2 + gap)) / 2;
-
             context.font = "italic " + seaweedFont;
             context.strokeRect(size / 2 - btnWidthSignatures / 2, topRowY, btnWidthSignatures, btnHeight);
             context.fillText("Signatures", size / 2, topRowY + btnHeight / 2);
-
             context.font = seaweedFont;
             context.strokeRect(bottomStartX, bottomRowY, btnWidthBottom, btnHeight);
             context.fillText("To be", bottomStartX + btnWidthBottom / 2, bottomRowY + btnHeight / 2);
@@ -184,37 +170,24 @@
             context.fillText("To do", bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2);
 
             const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.MeshBasicMaterial({
-                map: texture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-            });
-            const geometry = new THREE.PlaneGeometry(120, 60);
-            uiPlane = new THREE.Mesh(geometry, material);
+            const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+            uiPlane = new THREE.Mesh(new THREE.PlaneGeometry(120, 60), material);
             scene.add(uiPlane);
 
             const invisibleMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide });
             const planeW = 120, planeH = 60, canW = 1024, canH = 512;
-
-            const sigGeo = new THREE.PlaneGeometry(btnWidthSignatures / canW * planeW, btnHeight / canH * planeH);
-            const sigBtn = new THREE.Mesh(sigGeo, invisibleMat);
-            sigBtn.name = "signatures";
-            sigBtn.position.set(0, (canH/2 - (topRowY + btnHeight / 2)) / canH * planeH, 0.1);
-            uiPlane.add(sigBtn);
-            clickableObjects.push(sigBtn);
-
-            const beGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
-            const beBtn = new THREE.Mesh(beGeo, invisibleMat);
-            beBtn.name = "tobe";
-            beBtn.position.set(((bottomStartX + btnWidthBottom / 2) - canW/2) / canW * planeW, (canH/2 - (bottomRowY + btnHeight / 2)) / canH * planeH, 0.1);
-            uiPlane.add(beBtn);
-            clickableObjects.push(beBtn);
-
-            const doGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
-            const doBtn = new THREE.Mesh(doGeo, invisibleMat);
-            doBtn.name = "todo";
-            doBtn.position.set(((bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2) - canW/2) / canW * planeW, (canH/2 - (bottomRowY + btnHeight / 2)) / canH * planeH, 0.1);
-            uiPlane.add(doBtn);
-            clickableObjects.push(doBtn);
-
+            const addClickable = (name, x, y, w, h) => {
+                const geo = new THREE.PlaneGeometry(w / canW * planeW, h / canH * planeH);
+                const btn = new THREE.Mesh(geo, invisibleMat);
+                btn.name = name;
+                btn.position.set((x - canW/2) / canW * planeW, (canH/2 - y) / canH * planeH, 0.1);
+                uiPlane.add(btn);
+                clickableObjects.push(btn);
+            };
+            addClickable("signatures", size / 2, topRowY + btnHeight / 2, btnWidthSignatures, btnHeight);
+            addClickable("tobe", bottomStartX + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
+            addClickable("todo", bottomStartX + btnWidthBottom + gap + btnWidthBottom / 2, bottomRowY + btnHeight / 2, btnWidthBottom, btnHeight);
+            
             const doRefGeo = new THREE.PlaneGeometry(btnWidthBottom / canW * planeW, btnHeight / canH * planeH);
             const doRefBtn = new THREE.Mesh(doRefGeo, invisibleMat);
             doRefBtn.name = "todo_reflection";
@@ -226,7 +199,7 @@
             clock = new THREE.Clock();
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
-            camera.position.set(0, 5, 100);
+            camera.position.set(0, 50, 200);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setClearColor(0x000000, 0);
@@ -237,11 +210,19 @@
             const cubeLoader = new THREE.CubeTextureLoader();
             const skyboxTexture = cubeLoader.setPath('https://raw.githubusercontent.com/codypearce/some-skyboxes/master/skyboxes/purplenebula/').load(['purplenebula_ft.png', 'purplenebula_bk.png', 'purplenebula_up.png', 'purplenebula_dn.png', 'purplenebula_rt.png', 'purplenebula_lf.png']);
             scene.background = skyboxTexture;
+            
+            const textureLoader = new THREE.TextureLoader();
+            galaxyTexture = textureLoader.load('eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
+            const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
+            const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, blending: THREE.AdditiveBlending });
+            const galaxyPlane = new THREE.Mesh(galaxyGeo, galaxyMat);
+            galaxyPlane.position.set(0, 700, -5000);
+            scene.add(galaxyPlane);
 
             const waterGeometry = new THREE.PlaneGeometry(50000, 50000);
             ocean = new THREE.Water(waterGeometry, {
                 textureWidth: 512, textureHeight: 512,
-                waterNormals: new THREE.TextureLoader().load('https://threejs.org/examples/textures/waternormals.jpg', (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; }),
+                waterNormals: textureLoader.load('https://threejs.org/examples/textures/waternormals.jpg', (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; }),
                 sunDirection: new THREE.Vector3(), sunColor: 0xffffff,
                 waterColor: 0x001e0f, distortionScale: 3.7, fog: true
             });
@@ -260,36 +241,31 @@
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(clickableObjects, true);
-
             if (intersects.length > 0) {
                 const clickedName = intersects[0].object.name;
                 switch (clickedName) {
                     case 'signatures': window.open('https://ooda.wiki/wiki/Signatures', '_blank'); break;
                     case 'tobe': window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank'); break;
                     case 'todo': window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge"; break;
-                    case 'todo_reflection':
-                        if (!isFireCreated) {
-                            createFire();
-                        }
-                        break;
+                    case 'todo_reflection': if (!isFireCreated) { createFire(); } break;
                 }
             }
         }
 
+        const dummy = new THREE.Object3D(); // Re-use this object to avoid creating it every frame
         function animate() {
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            camera.position.y = 5 + Math.sin(elapsedTime * 0.4) * 0.5;
-            camera.position.x = Math.cos(elapsedTime * 0.2) * 2;
+            camera.position.y = 40 + Math.sin(elapsedTime * 0.4) * 5;
+            camera.position.x = Math.cos(elapsedTime * 0.2) * 10;
+            camera.lookAt(0, 0, 0);
 
             if (uiPlane) {
-                uiPlane.position.set(camera.position.x, camera.position.y + 8, camera.position.z - 150);
+                uiPlane.position.set(camera.position.x, camera.position.y + 15, camera.position.z - 150);
                 uiPlane.rotation.copy(camera.rotation);
-
                 const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
                 const todoButton = clickableObjects.find(o => o.name === 'todo');
                 if (reflectionButton && todoButton) {
@@ -299,24 +275,23 @@
                     reflectionButton.rotation.copy(camera.rotation);
                 }
             }
-
-            if (uiPlane) {
-                camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
-            }
             
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
+            if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
             
-            // --- NEW: Animate the fire shader and individual planes ---
             if (isFireCreated) {
-                // Update the time uniform for the shared material
                 fireMaterial.uniforms.time.value = elapsedTime;
-                
-                // Animate each flame individually
-                firePlanes.forEach(plane => {
-                    plane.position.y = 25 + Math.sin(elapsedTime * 2.0 + plane.userData.randomOffset) * 5;
-                    // Make flames always face the camera (billboarding)
-                    plane.lookAt(camera.position);
-                });
+                for (let i = 0; i < fireInstanceData.length; i++) {
+                    fireInstanceMesh.getMatrixAt(i, dummy.matrix);
+                    const pos = new THREE.Vector3();
+                    pos.setFromMatrixPosition(dummy.matrix);
+                    pos.y = fireInstanceData[i].baseY + Math.sin(elapsedTime * 3.0 + fireInstanceData[i].randomOffset) * 10;
+                    dummy.position.copy(pos);
+                    dummy.lookAt(camera.position); // Billboard
+                    dummy.updateMatrix();
+                    fireInstanceMesh.setMatrixAt(i, dummy.matrix);
+                }
+                fireInstanceMesh.instanceMatrix.needsUpdate = true;
             }
 
             renderer.render(scene, camera);
@@ -328,30 +303,18 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        document.fonts.ready.then(function () {
-            init();
-            animate();
-            window.addEventListener('resize', onWindowResize, false);
+        document.fonts.ready.then(() => {
+            init(); animate(); window.addEventListener('resize', onWindowResize, false);
         });
 
         const wayfindersAudio = document.getElementById('wayfindersAudio'), oceanAudio = document.getElementById('oceanAudio'), audioControl = document.getElementById('audio-controls');
         document.body.addEventListener('click', () => {
-            if (oceanAudio.paused) {
-                oceanAudio.volume = 0.2;
-                oceanAudio.muted = false;
-                oceanAudio.play().catch(e => console.error("Ocean audio could not be played:", e));
-            }
+            if (oceanAudio.paused) { oceanAudio.volume = 0.2; oceanAudio.muted = false; oceanAudio.play().catch(e => console.error("Ocean audio could not be played:", e)); }
         }, { once: true });
-
         audioControl.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (wayfindersAudio.paused) {
-                wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e));
-                audioControl.classList.add('playing');
-            } else {
-                wayfindersAudio.pause();
-                audioControl.classList.remove('playing');
-            }
+            if (wayfindersAudio.paused) { wayfindersAudio.play().catch(e => console.error("Music audio failed to play:", e)); audioControl.classList.add('playing'); } 
+            else { wayfindersAudio.pause(); audioControl.classList.remove('playing'); }
         });
     </script>
 </body>
