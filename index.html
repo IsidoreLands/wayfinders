@@ -64,21 +64,17 @@
         let uiPlane, galaxyTexture, fireMaterial;
         let isFireCreated = false;
         const clickableObjects = [];
-        // --- NEW: Variables for the fire overlay scene ---
+        // --- Screen-Space Fire Overlay ---
         let fireScene, fireCamera, firePlane;
 
-        // --- NEW: Screen-space fire overlay implementation ---
         function createFire() {
             fireScene = new THREE.Scene();
-            // Orthographic camera is for 2D effects, it has no perspective.
             fireCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
             const textureLoader = new THREE.TextureLoader();
             const flameTexture1 = textureLoader.load('flame-png-transparent-3.png');
             const flameTexture2 = textureLoader.load('flame-png-transparent-4.png');
-            [flameTexture1, flameTexture2].forEach(t => {
-                t.wrapS = t.wrapT = THREE.RepeatWrapping;
-            });
+            [flameTexture1, flameTexture2].forEach(t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; });
 
             const fireVertexShader = `
                 varying vec2 vUv;
@@ -95,20 +91,20 @@
                 varying vec2 vUv;
 
                 void main() {
-                    vec2 uv1 = vUv * vec2(10.0, 2.0) + vec2(time * -0.05, time * 0.1);
-                    vec2 uv2 = vUv * vec2(10.0, 2.0) + vec2(time * 0.03, time * -0.15);
+                    // Animate UVs to make the flames move
+                    vec2 uv1 = vUv * vec2(8.0, 1.5) + vec2(time * -0.05, 0.0);
+                    vec2 uv2 = vUv * vec2(8.0, 1.5) + vec2(time * 0.03, 0.0);
                     
                     vec4 tex1 = texture2D(flameTexture1, uv1);
                     vec4 tex2 = texture2D(flameTexture2, uv2);
 
-                    float blendFactor = (sin(time * 1.5 + vUv.x * 5.0) + 1.0) / 2.0;
+                    float blendFactor = (sin(time * 1.5 + vUv.x * 7.0) + 1.0) / 2.0;
                     vec4 finalColor = mix(tex1, tex2, blendFactor);
                     
-                    // --- FIX: Make flames appear only at the bottom of the screen ---
-                    // It fades from fully opaque at the bottom (y=0) to fully transparent at y=0.5 (mid-screen).
-                    finalColor.a *= smoothstep(0.5, 0.0, vUv.y);
+                    // Fade from opaque at the bottom (y=0) to transparent at one-third of the screen (y=0.33).
+                    finalColor.a *= smoothstep(0.33, 0.0, vUv.y);
 
-                    if (finalColor.a < 0.1) discard;
+                    if (finalColor.a < 0.01) discard; // Cleanly remove fully transparent pixels
 
                     gl_FragColor = finalColor;
                 }
@@ -121,9 +117,7 @@
                 transparent: true,
             });
             
-            // A plane that is 2 units wide and 2 units high perfectly fills the orthographic camera view.
-            const fireGeometry = new THREE.PlaneGeometry(2, 2);
-            firePlane = new THREE.Mesh(fireGeometry, fireMaterial);
+            firePlane = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fireMaterial);
             fireScene.add(firePlane);
             isFireCreated = true;
         }
@@ -177,7 +171,7 @@
         function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // --- FIX: Restore the low camera position to see the galaxy ---
+            // --- RESTORED: The low camera position that keeps the galaxy visible ---
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 30000);
             camera.position.set(0, 5, 100);
 
@@ -192,6 +186,7 @@
             scene.background = skyboxTexture;
             
             const textureLoader = new THREE.TextureLoader();
+            // --- RESTORED: The galaxy plane is back and correctly implemented ---
             galaxyTexture = textureLoader.load('eso0932a.jpg', (t) => { t.wrapS = THREE.RepeatWrapping; });
             const galaxyGeo = new THREE.PlaneGeometry(12000, 3000);
             const galaxyMat = new THREE.MeshBasicMaterial({ map: galaxyTexture, transparent: true, blending: THREE.AdditiveBlending });
@@ -238,12 +233,11 @@
             requestAnimationFrame(animate);
             const elapsedTime = clock.getElapsedTime();
 
-            // --- FIX: Restore the "boat sway" camera animation ---
+            // --- RESTORED: The correct "boat sway" camera animation ---
             camera.position.y = 5 + Math.sin(elapsedTime * 0.4) * 0.5;
             camera.position.x = Math.cos(elapsedTime * 0.2) * 2;
 
             if (uiPlane) {
-                // Adjust UI position for the lower camera
                 uiPlane.position.set(camera.position.x, camera.position.y + 8, camera.position.z - 150);
                 uiPlane.rotation.copy(camera.rotation);
                 const reflectionButton = clickableObjects.find(o => o.name === 'todo_reflection');
@@ -256,7 +250,6 @@
                 }
             }
             
-            // Look forward towards the UI's general area
             if (uiPlane) {
                 camera.lookAt(uiPlane.position.x, uiPlane.position.y, uiPlane.position.z - 1000);
             }
@@ -264,17 +257,16 @@
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
             
-            // First, render the main 3D scene
+            // --- UNCHANGED: Render the main 3D scene first ---
             renderer.render(scene, camera);
             
-            // --- NEW: Render the fire overlay scene on top ---
+            // --- UNCHANGED: Render the fire overlay on top, if it exists ---
             if (isFireCreated) {
                 fireMaterial.uniforms.time.value = elapsedTime;
-                // Layer the scenes correctly
                 renderer.autoClear = false;
-                renderer.clearDepth(); // Clear only the depth buffer
+                renderer.clearDepth();
                 renderer.render(fireScene, fireCamera);
-                renderer.autoClear = true; // Reset for the next frame
+                renderer.autoClear = true;
             }
         }
 
