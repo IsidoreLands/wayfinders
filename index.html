@@ -61,92 +61,8 @@
 
     <script>
         let scene, camera, renderer, ocean, clock, raycaster, mouse;
-        let uiPlane, galaxyTexture, fireMaterial;
-        let isFireCreated = false;
+        let uiPlane, galaxyTexture;
         const clickableObjects = [];
-
-        // --- NEW: Isolated Particle System for the Fire Effect ---
-        function createSubtleFireEffect() {
-            const PARTICLE_COUNT = 2000;
-            const SPREAD_RADIUS = 8000;
-            
-            const positions = [];
-            const customInfos = []; // To store size, lifetime, and random offset for each particle
-
-            for (let i = 0; i < PARTICLE_COUNT; i++) {
-                // Initial position on the water
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * SPREAD_RADIUS;
-                positions.push(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-
-                // pack size, lifetime, and a random offset into one attribute
-                customInfos.push(
-                    Math.random() * 20 + 10,   // size
-                    Math.random() * 3 + 2,     // lifetime (2-5 seconds)
-                    Math.random() * 100.0      // random offset for animation
-                );
-            }
-
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('customInfo', new THREE.Float32BufferAttribute(customInfos, 3));
-
-            const vertexShader = `
-                uniform float uTime;
-                attribute vec3 customInfo; // x: size, y: lifetime, z: random offset
-                varying float vAlpha;
-
-                void main() {
-                    float size = customInfo.x;
-                    float lifetime = customInfo.y;
-                    float randomOffset = customInfo.z;
-
-                    // Calculate the particle's age and progress
-                    float age = mod(uTime + randomOffset, lifetime);
-                    float progress = age / lifetime;
-
-                    // Fade in and out over its life
-                    vAlpha = sin(progress * 3.14159);
-                    
-                    // Animate position: rise and drift
-                    vec3 animatedPosition = position;
-                    animatedPosition.y += progress * 100.0; // Rise up
-                    animatedPosition.x += sin(uTime + randomOffset) * 20.0; // Drift sideways
-
-                    // Make the particle always face the camera (billboarding)
-                    vec4 mvPosition = modelViewMatrix * vec4(animatedPosition, 1.0);
-                    gl_PointSize = size * (300.0 / -mvPosition.z) * vAlpha;
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `;
-
-            const fragmentShader = `
-                uniform sampler2D uTexture;
-                varying float vAlpha;
-
-                void main() {
-                    vec4 texColor = texture2D(uTexture, gl_PointCoord);
-                    if (texColor.a < 0.1) discard; // Discard transparent parts of the texture
-                    gl_FragColor = texColor * vec4(1.0, 1.0, 1.0, vAlpha);
-                }
-            `;
-
-            fireMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    uTime: { value: 0.0 },
-                    uTexture: { value: new THREE.TextureLoader().load('flame-png-transparent-3.png') }
-                },
-                vertexShader: vertexShader,
-                fragmentShader: fragmentShader,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                transparent: true
-            });
-
-            const fireParticles = new THREE.Points(geometry, fireMaterial);
-            scene.add(fireParticles);
-            isFireCreated = true;
-        }
 
         function createInteractive3DUI() {
             const canvas = document.createElement('canvas');
@@ -249,9 +165,7 @@
                     case 'tobe': window.open('https://en.wikipedia.org/wiki/Wikipedia', '_blank'); break;
                     case 'todo': window.location.href = "mailto:admin@ooda.wiki?subject=Request%20to%20Join%20Wayfinder's%20Forge"; break;
                     case 'todo_reflection': 
-                        if (!isFireCreated) {
-                            createSubtleFireEffect();
-                        }
+                        console.log("Secret action triggered... but does nothing.");
                         break;
                 }
             }
@@ -283,11 +197,6 @@
             
             if (ocean) { ocean.material.uniforms['time'].value += 1.0 / 60.0; }
             if (galaxyTexture) { galaxyTexture.offset.x -= 0.00005; }
-
-            // --- MINIMAL CHANGE: Update the fire shader time if it exists ---
-            if (isFireCreated) {
-                fireMaterial.uniforms.uTime.value = elapsedTime;
-            }
             
             renderer.render(scene, camera);
         }
